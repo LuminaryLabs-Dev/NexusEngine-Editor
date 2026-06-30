@@ -1,0 +1,17 @@
+{
+  "name": "@luminarylabs/nexusengine-editor",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Static NexusEngine web editor shell for building DSK-driven games as HTML files.",
+  "scripts": {
+    "build": "node scripts/build-static-site.mjs",
+    "build:game": "node scripts/build-dsk-game-html.mjs examples/dsk-games/starter-game.json dist/games/starter-game.html",
+    "smoke:intent": "node scripts/intent-smoke.mjs",
+    "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
+    "test": "npm run smoke:intent && npm run build && npm run smoke:playwright"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}

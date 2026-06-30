@@ -1,0 +1,23 @@
+{
+  "title": "Starter DSK Game",
+  "domainPath": "n:game:starter",
+  "version": "0.1.0",
+  "viewport": {
+    "width": 960,
+    "height": 540,
+    "background": "#111827"
+  },
+  "kits": [
+    { "domainPath": "n:render:three", "label": "Three Renderer" },
+    { "domainPath": "n:physics", "label": "Physics" },
+    { "domainPath": "n:build:web", "label": "Web Build" }
+  ],
+  "scene": {
+    "title": "Starter Scene",
+    "entities": [
+      { "id": "player", "label": "Player", "x": 120, "y": 280, "width": 56, "height": 56, "color": "#34d399" },
+      { "id": "platform", "label": "Platform", "x": 80, "y": 370, "width": 760, "height": 34, "color": "#64748b" },
+      { "id": "goal", "label": "Goal", "x": 760, "y": 280, "width": 56, "height": 88, "color": "#fbbf24" }
+    ]
+  }
+}
