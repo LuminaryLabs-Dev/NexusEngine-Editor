@@ -1,0 +1,57 @@
+# Change Log
+
+Status: active
+
+## Entries
+
+- 2026-06-30 20:48:20 America/New_York - Created `.agent/` workspace for the 3D Domain Service Kit editor goal and saved the target screenshot reference.
+- 2026-06-30 21:34:00 America/New_York - Switched `.agent` from planning-only to active implementation for the current goal.
+- 2026-06-30 21:34:00 America/New_York - Implemented the first viewport-first 3D editor slice: grid/default cube scene, top command strip, Domain Stack, Configure, and Sequence Timeline overlays.
+- 2026-06-30 21:34:00 America/New_York - Added a shared editor domain model and upgraded HTML export to preserve 3D scene, domain stack, kit config, and sequence data.
+- 2026-06-30 21:34:00 America/New_York - Updated smoke checks to validate add-kit, add-step, link-event, sequence validation, Play mode, and single HTML export.
+- 2026-06-30 21:34:00 America/New_York - Expanded `.gitignore` so Playwright diagnostics, traces, reports, and videos stay out of the repo.
+- 2026-06-30 21:47:00 America/New_York - Added a dependency-free WebGL viewport renderer so the first view is backed by an actual 3D canvas, not only CSS scene dressing.
+- 2026-06-30 21:23:42 America/New_York - Added goal packet `002-draggable-panels-and-scene-scale.md` for draggable overlays and multi-object scene authoring.
+- 2026-06-30 21:23:42 America/New_York - Implemented draggable overlay panels with editor-state positions.
+- 2026-06-30 21:23:42 America/New_York - Added multi-object scene authoring: add/select cube objects, edit transforms, render all objects in WebGL, and preserve them in HTML export.
+- 2026-06-30 22:09:25 America/New_York - Added goal packet `003-registry-backed-kit-picker.md` and feedback packet `002-registry-backed-kit-picker.md` for the NexusRealtime registry-backed Add Kit flow.
+- 2026-06-30 22:09:25 America/New_York - Implemented a registry/dropdown kit picker, installer actions, dependency/sub-kit display, and export metadata preservation.
+- 2026-06-30 22:20:40 America/New_York - Added goal packet `004-scalable-domain-stack-health-map.md` for large-game Domain Stack scale controls.
+- 2026-06-30 22:20:40 America/New_York - Implemented installed-kit filtering, Stack/Map views, dependency health, and `domainStackHealth` export metadata.
+- 2026-06-30 22:36:20 EDT - Added goal packet `005-manifest-driven-sequence-events.md` for source/event/target/output sequence links.
+- 2026-06-30 22:36:20 EDT - Implemented visible composite sub-kit previews and manifest-driven sequence link dropdowns backed by installed kit configs.
+- 2026-06-30 22:49:11 EDT - Added goal packet `006-scene-outliner-bulk-authoring.md` for large-scene object authoring.
+- 2026-06-30 22:49:11 EDT - Implemented compact scene stats, object search, add-25 grid batches, duplicate, and delete in the Configure overlay.
+- 2026-06-30 23:03:20 EDT - Added goal packet `007-project-persistence-snapshots.md` for local Save/Load project snapshots.
+- 2026-06-30 23:03:20 EDT - Implemented `editor-project-persistence-kit`, command-strip Load, Saved/Loaded status, and localStorage-backed project restore.
+- 2026-06-30 23:13:27 EDT - Added goal packet `008-bulk-domain-kit-assignment.md` for assigning selected Domain Service Kits to filtered scene objects.
+- 2026-06-30 23:13:27 EDT - Implemented bulk assignment from the selected Domain Stack kit to current filtered visible scene objects and updated smoke/Playwright proof.
+- 2026-06-30 23:26:55 EDT - Added goal packet `009-large-scene-windowing.md` for configurable scene batches and visible-result limits.
+- 2026-06-30 23:26:55 EDT - Implemented large-scene object windowing, configurable grid batch size, mobile layout fixes, and 501-object live Playwright proof.
+- 2026-06-30 23:39:50 EDT - Added goal packet `010-sequence-playback-receipts.md` for kit-driven sequence execution proof.
+- 2026-06-30 23:39:50 EDT - Implemented Step/Sequence/Play execution receipts, Save/Load playback restore, exported `runSequence()`, and live Playwright proof outside the repo.
+- 2026-06-30 23:49:32 EDT - Added goal packet `011-scene-authoring-presets.md` for structured large-scene preset authoring.
+- 2026-06-30 23:49:32 EDT - Implemented `editor-scene-preset-kit`, Configure-panel preset controls, preset metadata export, and smoke proof for physics stress-grid authoring.
+- 2026-07-01 00:03:40 EDT - Added goal packet `012-scalable-html-runtime.md` for exported game runtime scale.
+- 2026-07-01 00:03:40 EDT - Implemented canvas-based single-file HTML runtime stats/culling in `editor-html-build-kit` and added smoke proof for generated runtime surfaces.
+- 2026-07-01 00:10:42 EDT - Added goal packet `013-build-profile-controls.md` for configurable massive-game export budgets.
+- 2026-07-01 00:10:42 EDT - Implemented `n:build:web` Configure controls for renderer, max drawn objects, and culling with manifest/export proof.
+- 2026-07-01 00:20:58 EDT - Added goal packet `014-project-file-portability.md` for portable editor project snapshots.
+- 2026-07-01 00:20:58 EDT - Implemented `n:persistence` Configure controls for `.project.json` export/import through `editor-project-persistence-kit`.
+- 2026-07-01 00:32:56 EDT - Added goal packet `015-sequence-step-inspector.md` for right-panel sequence step editing.
+- 2026-07-01 00:32:56 EDT - Implemented Configure-panel sequence step label/source/event/target controls through `editor-sequence-timeline-kit`.
+- 2026-07-01 00:43:53 EDT - Added goal packet `016-editor-viewport-culling.md` for editor-side viewport draw budgets.
+- 2026-07-01 00:43:53 EDT - Implemented `n:render:three` Configure controls and WebGL drawn/culled stats for massive editor scenes.
+- 2026-07-01 01:03:06 EDT - Added goal packet `017-visible-registry-kit-dropdown.md` for the user correction that kit adding must expose a real registry dropdown and sub-domains immediately.
+- 2026-07-01 01:03:06 EDT - Made the Domain Stack registry selector visible by default, defaulted it to `spatial-authoring-kits`, and validated bundle metadata export with Playwright diagnostics.
+- 2026-07-01 01:25:32 EDT - Added goal packet `018-viewport-tool-actions.md` for real viewport toolbar behavior owned by `editor-selection-kit`.
+- 2026-07-01 01:25:32 EDT - Implemented persisted Select/Move/Rotate/Scale/Pan tool state, selected-object transform nudges, and live Playwright proof against the served editor.
+- 2026-07-01 01:34:10 EDT - Added goal packet `019-game-template-authoring.md` for one-action massive game composition.
+- 2026-07-01 01:34:10 EDT - Implemented `editor-game-template-kit` with registry installs, large scene stamping, sequence wiring, build/viewport budgets, and Playwright proof.
+- 2026-07-01 01:42:22 EDT - Added goal packet `020-exported-sequence-controls.md` for visible kit-sequence playback inside generated HTML games.
+- 2026-07-01 01:42:22 EDT - Implemented exported `Run Sequence` controls, receipt counts, and recent receipt rendering in `editor-html-build-kit`.
+- 2026-07-01 06:35:00 EDT - Entered the post-three-loop documentation phase and added `game-loop-retrospective.md` with loop evidence, CLI/MCP capability map, blocker analysis, and CR-013 through CR-017.
+- 2026-07-01 06:45:00 EDT - Added goal packet `021-runtime-interaction-kit.md` and `completion-audit.md` to document why the active loop goal remains incomplete until generic interaction runtime proof exists.
+- 2026-07-01 06:53:52 EDT - Implemented Goal Packet 021 with `editor-runtime-interaction-kit`, generic `runtimeClickable` exports, Gem Collector proof, browser-blocked kit-mutating templates, and MCP `editor_cli_game_screenshot` validation.
+- 2026-07-01 06:55:00 EDT - Added `runtime-interaction-implementation-handoff.md` and `runtime-interaction-validation-matrix.md` to map Goal Packet 021 to source files, implementation sequence, proof surfaces, and screenshot artifacts.
+- 2026-07-01 07:07:39 EDT - Revalidated a UI-only Platform Run loop after CLI-only kit mutation, fixed `New` reset to stop stale play mode, captured `.agent/screenshots/ui-only-platform-run-loop.png`, and passed `npm test`.

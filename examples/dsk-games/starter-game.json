@@ -1,23 +1,59 @@
 {
-  "title": "Starter DSK Game",
+  "title": "Starter 3D Scene",
   "domainPath": "n:game:starter",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "viewport": {
-    "width": 960,
-    "height": 540,
-    "background": "#111827"
+    "mode": "3d",
+    "width": 1280,
+    "height": 720,
+    "background": "#0b1420",
+    "gridSize": 24
   },
-  "kits": [
-    { "domainPath": "n:render:three", "label": "Three Renderer" },
-    { "domainPath": "n:physics", "label": "Physics" },
-    { "domainPath": "n:build:web", "label": "Web Build" }
-  ],
-  "scene": {
+  "scene3d": {
     "title": "Starter Scene",
-    "entities": [
-      { "id": "player", "label": "Player", "x": 120, "y": 280, "width": 56, "height": 56, "color": "#34d399" },
-      { "id": "platform", "label": "Platform", "x": 80, "y": 370, "width": 760, "height": 34, "color": "#64748b" },
-      { "id": "goal", "label": "Goal", "x": 760, "y": 280, "width": 56, "height": 88, "color": "#fbbf24" }
+    "units": "meters",
+    "camera": {
+      "id": "camera-main",
+      "label": "Main Camera",
+      "position": { "x": -4.4, "y": 3.1, "z": 5.2 },
+      "target": { "x": 0, "y": 0, "z": 0 }
+    },
+    "light": {
+      "id": "sun-key",
+      "label": "Key Light",
+      "type": "directional",
+      "intensity": 1
+    },
+    "objects": [
+      {
+        "id": "cube-01",
+        "label": "Default Cube",
+        "type": "mesh:cube",
+        "selected": true,
+        "transform": {
+          "position": { "x": 0, "y": 1, "z": 0 },
+          "rotation": { "x": 0, "y": 0, "z": 0 },
+          "scale": { "x": 1, "y": 1, "z": 1 }
+        },
+        "material": {
+          "color": "#d1d5db",
+          "roughness": 0.58,
+          "metallic": 0.06
+        }
+      }
     ]
-  }
+  },
+  "domainStack": [
+    { "id": "domain-scene", "domainPath": "n:scene", "label": "Starter Scene", "subtitle": "Scene Root", "status": "ready" },
+    { "id": "domain-render-three", "domainPath": "n:render:three", "label": "Three Renderer", "subtitle": "Render Engine", "status": "ready" },
+    { "id": "domain-camera", "domainPath": "n:camera", "label": "Camera System", "subtitle": "Orbit Camera", "status": "ready" },
+    { "id": "domain-input", "domainPath": "n:input", "label": "Input System", "subtitle": "Pointer + Keys", "status": "ready" },
+    { "id": "domain-physics", "domainPath": "n:physics", "label": "Physics Engine", "subtitle": "Rigidbodies + Queries", "status": "attention" },
+    { "id": "domain-build-web", "domainPath": "n:build:web", "label": "Web Build", "subtitle": "Single HTML Export", "status": "ready" }
+  ],
+  "sequenceSteps": [
+    { "id": "step-01", "order": 1, "domainPath": "n:input", "label": "input.pointer", "event": "input:pointer", "targetDomainPath": "n:camera", "targetOutput": "out:view", "target": "camera.orbit" },
+    { "id": "step-02", "order": 2, "domainPath": "n:physics", "label": "physics.tick", "event": "on:collide", "targetDomainPath": "n:render:three", "targetOutput": "out:frame", "target": "render.frame" },
+    { "id": "step-03", "order": 3, "domainPath": "n:build:web", "label": "build.web", "event": "build:start", "targetDomainPath": "n:build:web", "targetOutput": "export:html", "target": "export.html" }
+  ]
 }

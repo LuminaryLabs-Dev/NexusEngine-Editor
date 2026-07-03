@@ -1,13 +1,20 @@
+import { createEditorProject, createSequencePlaybackState } from "../editor-domain-model.js";
+import { createEditorKitInstallSurface } from "../editor-kit-registry.js";
+
 export const EDITOR_KITS = Object.freeze([
-  { id: "n-editor-kit", domainPath: "n:editor", label: "Editor Root", role: "root" },
-  { id: "n-editor-viewport-kit", domainPath: "n:editor:viewport", label: "Viewport", role: "full-game-viewport" },
-  { id: "n-editor-header-kit", domainPath: "n:editor:header", label: "Header", role: "play-stop-save-build" },
-  { id: "n-editor-dock-kit", domainPath: "n:editor:dock", label: "Dock System", role: "dock-shell" },
-  { id: "n-editor-kits-dock-kit", domainPath: "n:editor:dock:kits", label: "Kits Dock", role: "left-dock" },
-  { id: "n-editor-inspector-dock-kit", domainPath: "n:editor:dock:inspector", label: "Inspector Dock", role: "right-dock" },
-  { id: "n-editor-proof-dock-kit", domainPath: "n:editor:dock:proof", label: "Proof Dock", role: "bottom-dock" },
-  { id: "n-editor-selection-kit", domainPath: "n:editor:selection", label: "Selection", role: "viewport-selection" },
-  { id: "n-editor-status-kit", domainPath: "n:editor:status", label: "Status", role: "project-health" }
+  { id: "editor-root-kit", domainPath: "n:editor", label: "Editor Root", role: "root" },
+  { id: "editor-viewport-kit", domainPath: "n:editor:viewport", label: "3D Viewport", role: "full-3d-scene-viewport" },
+  { id: "editor-command-strip-kit", domainPath: "n:editor:header", label: "Command Strip", role: "play-stop-save-build-export" },
+  { id: "editor-overlay-panel-kit", domainPath: "n:editor:dock", label: "Docked Panel System", role: "docked-overlay-shell" },
+  { id: "editor-domain-stack-kit", domainPath: "n:editor:dock:kits", label: "Domain Stack Panel", role: "left-domain-stack" },
+  { id: "editor-configure-panel-kit", domainPath: "n:editor:dock:inspector", label: "Configure Panel", role: "right-configure" },
+  { id: "editor-sequence-timeline-kit", domainPath: "n:editor:dock:sequence", label: "Sequence Timeline", role: "bottom-sequence" },
+  { id: "editor-scene-preset-kit", domainPath: "n:editor:scene-preset", label: "Scene Presets", role: "mass-scene-authoring" },
+  { id: "editor-game-template-kit", domainPath: "n:editor:game-template", label: "Game Templates", role: "massive-game-authoring" },
+  { id: "editor-runtime-interaction-kit", domainPath: "n:runtime:interaction", label: "Runtime Interaction", role: "exported-clickable-interactions" },
+  { id: "editor-project-persistence-kit", domainPath: "n:editor:persistence", label: "Project Persistence", role: "save-load-project-snapshots" },
+  { id: "editor-selection-kit", domainPath: "n:editor:selection", label: "Selection", role: "viewport-domain-selection" },
+  { id: "editor-status-kit", domainPath: "n:editor:status", label: "Status", role: "project-health" }
 ]);
 
 export function createEditorKitRegistry(kits = EDITOR_KITS) {
@@ -21,22 +28,80 @@ export function createEditorKitRegistry(kits = EDITOR_KITS) {
 
 export function createEditorState() {
   const kitRegistry = createEditorKitRegistry();
+  const domainKitSurface = createEditorKitInstallSurface();
   return {
     mode: "stopped",
-    selectedDomainPath: "n:editor:viewport",
+    configureSubject: "domain",
+    selectedDomainPath: "n:physics",
+    selectedSequenceStepId: "step-02",
+    selectedObjectId: "cube-01",
+    domainStackView: {
+      mode: "stack",
+      query: "",
+      health: "all"
+    },
+    sceneObjectView: {
+      query: "",
+      limit: 100,
+      batchSize: 25,
+      presetId: "arena-blockout-preset"
+    },
+    gameTemplateView: {
+      selectedTemplateId: "chess-board-template",
+      lastAppliedTemplateId: "",
+      lastObjectCount: 0,
+      lastSequenceStepIds: []
+    },
+    kitPicker: {
+      open: false,
+      query: "",
+      category: "",
+      selectedKitId: "spatial-authoring-kits",
+      lastInstallPlan: null
+    },
+    viewportTool: {
+      active: "select",
+      nudgeStep: 0.25,
+      rotateStep: 15,
+      scaleStep: 0.1,
+      lastAction: ""
+    },
+    panelPositions: {},
+    viewportRenderStats: {
+      renderer: "webgl",
+      culling: "distance-window",
+      totalObjects: 1,
+      drawnObjects: 1,
+      culledObjects: 0,
+      maxDrawnObjects: 700,
+      frame: 0
+    },
+    projectPersistence: {
+      status: "idle",
+      storageKey: "nexusengine-editor:project-snapshot",
+      lastSavedAt: "",
+      lastLoadedAt: "",
+      lastExportedAt: "",
+      lastImportedAt: "",
+      lastExportFileName: "",
+      lastImportFileName: "",
+      exportBytes: 0,
+      importBytes: 0,
+      lastExportJson: "",
+      bytes: 0
+    },
+    project: createEditorProject(),
+    sequencePlayback: createSequencePlaybackState(),
     build: {
       status: "idle",
       html: "",
       fileName: "",
       bytes: 0
     },
-    docks: {
-      kits: "hidden",
-      inspector: "hidden",
-      proof: "hidden"
-    },
     events: [],
-    kitRegistry
+    kitRegistry,
+    domainKitRegistry: domainKitSurface.registry,
+    domainKitInstaller: domainKitSurface.installer
   };
 }
 

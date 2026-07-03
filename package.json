@@ -7,6 +7,11 @@
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
     "build:game": "node scripts/build-dsk-game-html.mjs examples/dsk-games/starter-game.json dist/games/starter-game.html",
+    "cli": "node scripts/nexus-engine-editor-cli.mjs",
+    "cli:chess": "node scripts/nexus-engine-editor-cli.mjs operations submit chess-game --param html=dist/games/nexus-chess.html --param project=dist/games/nexus-chess.project.json",
+    "cli:target-clicker": "node scripts/nexus-engine-editor-cli.mjs operations submit target-clicker-game --param html=dist/games/nexus-target-clicker.html --param project=dist/games/nexus-target-clicker.project.json",
+    "cli:gem-collector": "node scripts/nexus-engine-editor-cli.mjs operations submit gem-collector-game --param html=dist/games/nexus-gem-collector.html --param project=dist/games/nexus-gem-collector.project.json",
+    "mcp:screenshot": "node scripts/nexus-engine-editor-screenshot-mcp.mjs",
     "smoke:intent": "node scripts/intent-smoke.mjs",
     "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
     "test": "npm run smoke:intent && npm run build && npm run smoke:playwright"
