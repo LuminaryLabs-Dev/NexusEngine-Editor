@@ -1,5 +1,6 @@
 import { createEditorProject, createSequencePlaybackState } from "../editor-domain-model.js";
 import { createEditorKitInstallSurface } from "../editor-kit-registry.js";
+import { EDITOR_FEATURE_CONTRACTS_KIT_ID } from "./editor-feature-contracts-kit/index.js";
 
 export const EDITOR_KITS = Object.freeze([
   { id: "editor-root-kit", domainPath: "n:editor", label: "Editor Root", role: "root" },
@@ -14,6 +15,7 @@ export const EDITOR_KITS = Object.freeze([
   { id: "editor-runtime-interaction-kit", domainPath: "n:runtime:interaction", label: "Runtime Interaction", role: "exported-clickable-interactions" },
   { id: "editor-project-persistence-kit", domainPath: "n:editor:persistence", label: "Project Persistence", role: "save-load-project-snapshots" },
   { id: "editor-selection-kit", domainPath: "n:editor:selection", label: "Selection", role: "viewport-domain-selection" },
+  { id: EDITOR_FEATURE_CONTRACTS_KIT_ID, domainPath: "n:editor:feature-contracts", label: "Feature Contracts", role: "dsk-feature-ownership" },
   { id: "editor-status-kit", domainPath: "n:editor:status", label: "Status", role: "project-health" }
 ]);
 

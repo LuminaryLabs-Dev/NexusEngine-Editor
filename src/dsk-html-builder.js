@@ -182,6 +182,8 @@ export function normalizeDskGameManifest(input = {}) {
     domainStackHealth: clone(source.domainStackHealth ?? {}),
     kits: (Array.isArray(source.kits) && source.kits.length ? source.kits : domainStack).map(normalizeKit),
     kitConfigs: clone(source.kitConfigs ?? DEFAULT_DSK_GAME.kitConfigs),
+    featureContracts: clone(source.featureContracts ?? DEFAULT_DSK_GAME.featureContracts ?? []),
+    featureContractValidation: clone(source.featureContractValidation ?? DEFAULT_DSK_GAME.featureContractValidation ?? {}),
     runtime: normalizeRuntime(source.runtime ?? {}),
     sequenceSteps: (Array.isArray(source.sequenceSteps) && source.sequenceSteps.length ? source.sequenceSteps : DEFAULT_DSK_GAME.sequenceSteps).map(normalizeStep),
     sequenceGraph: clone(source.sequenceGraph ?? {})

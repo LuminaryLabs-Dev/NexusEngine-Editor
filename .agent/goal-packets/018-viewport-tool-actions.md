@@ -4,7 +4,7 @@ Status: complete
 
 ## Intent
 
-Turn the viewport toolbar into real editor actions owned by a NexusRealtime-style editor kit, not decorative buttons.
+Turn the viewport toolbar into real editor actions owned by a NexusEngine-style editor kit, not decorative buttons.
 
 ## User Need
 

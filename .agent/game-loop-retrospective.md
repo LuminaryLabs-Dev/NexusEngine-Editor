@@ -9,7 +9,7 @@ Document the first three NexusEngine Editor build/test loops after the editor be
 ## Scope
 
 - Repo: `NexusEngine-Editor`
-- Runtime model: NexusRealtime-style composed editor kits
+- Runtime model: NexusEngine-style composed editor kits
 - UI surface: viewport-first browser editor
 - Documentation phase: started after three build/test loops
 

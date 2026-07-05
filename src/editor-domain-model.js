@@ -1,3 +1,5 @@
+import { listEditorFeatureContracts, validateEditorFeatureContracts } from "./kits/editor-feature-contracts-kit/index.js";
+
 const DEFAULT_VECTOR = Object.freeze({ x: 0, y: 0, z: 0 });
 
 export const ADDABLE_DOMAIN_KITS = Object.freeze([
@@ -1829,6 +1831,8 @@ export function buildEditorExportManifest(project) {
       children: clone(domain.children ?? [])
     })),
     kitConfigs: clone(project.kitConfigs),
+    featureContracts: listEditorFeatureContracts(),
+    featureContractValidation: validateEditorFeatureContracts(),
     runtime: normalizeBuildRuntimeConfig(project),
     sequenceSteps: clone(project.sequenceSteps),
     sequenceGraph: validateSequenceLinks(project)

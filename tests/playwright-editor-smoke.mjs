@@ -230,6 +230,8 @@ try {
   assert.equal(parsed.scene3d.authoringPresets[0].count, 120);
   assert.equal(parsed.runtime.maxDrawnObjects, 120);
   assert.equal(parsed.runtime.culling, "distance-window");
+  assert.equal(parsed.featureContractValidation.ok, true);
+  assert.ok(parsed.featureContracts.some((contract) => contract.featureId === "sequence-timeline" && contract.owningKitId === "editor-sequence-timeline-kit"));
   assert.equal(parsed.scene3d.objects[1].transform.position.x, 3.5);
   assert.ok(parsed.scene3d.objects[1].domainKits.includes("n:physics"));
   assert.equal(parsed.scene3d.objects[1].components.physics.domainPath, "n:physics");
@@ -258,9 +260,10 @@ try {
   assert.equal(viewportStats.culledObjects, 307);
   assert.equal(viewportStats.maxDrawnObjects, 90);
   const runtime = await page.evaluate(() => window.__NEXUS_EDITOR_RUNTIME__);
-  assert.ok(runtime.source === "fallback:compatible-nexusrealtime" || runtime.source.includes("NexusRealtime"));
+  assert.ok(runtime.source === "fallback:compatible-nexusengine" || runtime.source.includes("NexusEngine"));
   assert.deepEqual(runtime.installOrder, [
     "editor-composition-kit",
+    "editor-feature-contracts-kit",
     "editor-kit-registry-kit",
     "editor-kit-installer-kit",
     "editor-domain-stack-kit",
@@ -273,6 +276,7 @@ try {
     "editor-project-persistence-kit",
     "editor-html-build-kit"
   ]);
+  assert.ok(runtime.bindings.includes("featureContracts"));
   const canvasSize = await page.locator("#viewport-canvas").evaluate((canvas) => ({ width: canvas.width, height: canvas.height }));
   assert.ok(canvasSize.width > 0);
   assert.ok(canvasSize.height > 0);

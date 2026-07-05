@@ -30,13 +30,14 @@ This `.agent` workspace is the handoff layer for turning NexusEngine Editor from
 20. `goal-packets/019-game-template-authoring.md`
 21. `goal-packets/020-exported-sequence-controls.md`
 22. `goal-packets/021-runtime-interaction-kit.md`
-23. `game-loop-progress.md`
-24. `game-loop-retrospective.md`
-25. `completion-audit.md`
-26. `runtime-interaction-implementation-handoff.md`
-27. `runtime-interaction-validation-matrix.md`
-28. `feedback.md`
-29. `feedback-packets/001-viewport-first-3d-editor.md`
+23. `goal-packets/022-nexusengine-feature-contracts.md`
+24. `game-loop-progress.md`
+25. `game-loop-retrospective.md`
+26. `completion-audit.md`
+27. `runtime-interaction-implementation-handoff.md`
+28. `runtime-interaction-validation-matrix.md`
+29. `feedback.md`
+30. `feedback-packets/001-viewport-first-3d-editor.md`
 
 ## Visual Target
 

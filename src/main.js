@@ -7,7 +7,7 @@ import {
   normalizeViewportRuntimeConfig,
   selectSceneObject
 } from "./editor-domain-model.js";
-import { createNexusRealtimeEditorRuntime, loadNexusRealtimeModule } from "./nexus-realtime-editor-runtime.js";
+import { createNexusEngineEditorRuntime, loadNexusEngineModule } from "./nexus-engine-editor-runtime.js";
 import { createViewportRenderer } from "./viewport-webgl.js";
 
 const state = createEditorState();
@@ -21,10 +21,10 @@ const VIEWPORT_TOOL_BUTTONS = Object.freeze([
   { id: "scale", label: "□", title: "Scale" },
   { id: "pan", label: "✋", title: "Pan" }
 ]);
-const nexusRealtimeLoad = await loadNexusRealtimeModule({ allowRemote: true });
-state.editorRuntime = createNexusRealtimeEditorRuntime({
-  NexusRealtime: nexusRealtimeLoad.module,
-  source: nexusRealtimeLoad.source,
+const nexusEngineLoad = await loadNexusEngineModule({ allowRemote: true });
+state.editorRuntime = createNexusEngineEditorRuntime({
+  NexusEngine: nexusEngineLoad.module,
+  source: nexusEngineLoad.source,
   state,
   root,
   recordEvent: (type, payload) => recordEditorEvent(state, type, payload)

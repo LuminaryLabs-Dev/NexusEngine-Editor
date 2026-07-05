@@ -35,8 +35,13 @@ import {
   updateSceneObjectTransform
 } from "./editor-domain-model.js";
 import { buildDskGameHtml, createDskGameFileName } from "./dsk-html-builder.js";
+import {
+  EDITOR_FEATURE_CONTRACTS_KIT_ID,
+  listEditorFeatureContracts,
+  validateEditorFeatureContracts
+} from "./kits/editor-feature-contracts-kit/index.js";
 
-export const NEXUS_REALTIME_CDN_URL = "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusRealtime@0.0.2/src/index.js";
+export const NEXUS_ENGINE_CDN_URL = "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@0.0.3/src/index.js";
 const DEFAULT_PROJECT_STORAGE_KEY = "nexusengine-editor:project-snapshot";
 const VIEWPORT_TOOL_IDS = Object.freeze(["select", "move", "rotate", "scale", "pan"]);
 const VIEWPORT_TOOL_SET = new Set(VIEWPORT_TOOL_IDS);
@@ -55,7 +60,7 @@ function normalizeTokenList(value, fieldName, kitId) {
   });
 }
 
-function createFallbackNexusRealtime() {
+function createFallbackNexusEngine() {
   function defineRuntimeKit(config = {}) {
     const id = config.id ?? "runtime-kit";
     return Object.freeze({
@@ -148,7 +153,7 @@ function createFallbackNexusRealtime() {
   });
 }
 
-function isNexusRealtimeModule(candidate) {
+function isNexusEngineModule(candidate) {
   return Boolean(
     candidate &&
     typeof candidate.defineRuntimeKit === "function" &&
@@ -186,17 +191,17 @@ function createProjectStorageAdapter(storage = globalThis?.localStorage) {
   };
 }
 
-export async function loadNexusRealtimeModule(options = {}) {
+export async function loadNexusEngineModule(options = {}) {
   const {
     allowRemote = true,
     globalObject = globalThis,
     importModule = (url) => import(url),
     timeoutMs = 2500,
-    url = globalObject?.NEXUS_REALTIME_URL ?? NEXUS_REALTIME_CDN_URL
+    url = globalObject?.NEXUS_ENGINE_URL ?? NEXUS_ENGINE_CDN_URL
   } = options;
 
-  if (isNexusRealtimeModule(globalObject?.NexusRealtime)) {
-    return { module: globalObject.NexusRealtime, source: "global:NexusRealtime" };
+  if (isNexusEngineModule(globalObject?.NexusEngine)) {
+    return { module: globalObject.NexusEngine, source: "global:NexusEngine" };
   }
 
   if (allowRemote && typeof url === "string" && url) {
@@ -204,10 +209,10 @@ export async function loadNexusRealtimeModule(options = {}) {
       const module = await Promise.race([
         importModule(url),
         new Promise((_, reject) => {
-          globalObject.setTimeout?.(() => reject(new Error("NexusRealtime import timed out.")), timeoutMs);
+          globalObject.setTimeout?.(() => reject(new Error("NexusEngine import timed out.")), timeoutMs);
         })
       ]);
-      if (isNexusRealtimeModule(module)) return { module, source: url };
+      if (isNexusEngineModule(module)) return { module, source: url };
     } catch {
       return { module: null, source: "fallback:remote-unavailable" };
     }
@@ -217,8 +222,8 @@ export async function loadNexusRealtimeModule(options = {}) {
 }
 
 export function createEditorRuntimeKits(options = {}) {
-  const { NexusRealtime, state, recordEvent = () => {} } = options;
-  const defineRuntimeKit = NexusRealtime.defineRuntimeKit;
+  const { NexusEngine, state, recordEvent = () => {} } = options;
+  const defineRuntimeKit = NexusEngine.defineRuntimeKit;
   const projectStorage = createProjectStorageAdapter(options.projectStorage);
   const projectStorageKey = state.projectPersistence?.storageKey ?? DEFAULT_PROJECT_STORAGE_KEY;
   const kitMutationMode = options.kitMutationMode === "cli" ? "cli" : "read-only";
@@ -1053,6 +1058,24 @@ export function createEditorRuntimeKits(options = {}) {
     }
   };
 
+  const featureContracts = {
+    list: listEditorFeatureContracts,
+    validate(requiredFeatureIds = []) {
+      const validation = validateEditorFeatureContracts(requiredFeatureIds);
+      recordEvent("editor.feature-contracts.validated", {
+        domainPath: "n:editor:feature-contracts",
+        severity: validation.ok ? "info" : "warning",
+        total: validation.total,
+        missing: validation.missing,
+        invalid: validation.invalid
+      });
+      return validation;
+    },
+    getSnapshot() {
+      return validateEditorFeatureContracts();
+    }
+  };
+
   return [
     defineRuntimeKit({
       id: "editor-composition-kit",
@@ -1061,8 +1084,15 @@ export function createEditorRuntimeKits(options = {}) {
       metadata: { label: "Editor Composition", domainPath: "n:editor:composition" }
     }),
     defineRuntimeKit({
-      id: "editor-kit-registry-kit",
+      id: EDITOR_FEATURE_CONTRACTS_KIT_ID,
       requires: ["editor:composition"],
+      provides: ["editor:feature-contracts", "n:editor:feature-contracts"],
+      bindings: { featureContracts },
+      metadata: { label: "Editor Feature Contracts", domainPath: "n:editor:feature-contracts" }
+    }),
+    defineRuntimeKit({
+      id: "editor-kit-registry-kit",
+      requires: ["editor:composition", "editor:feature-contracts"],
       provides: ["editor:kit-registry", "n:registry", "n:registry:index", "n:registry:search", "n:registry:dependency"],
       bindings: { kitRegistry },
       metadata: { label: "Editor Kit Registry", domainPath: "n:registry" }
@@ -1140,19 +1170,19 @@ export function createEditorRuntimeKits(options = {}) {
   ];
 }
 
-export function createNexusRealtimeEditorRuntime(options = {}) {
-  const { state, root = null, canvas = null, NexusRealtime: suppliedModule = null, source = "fallback:local" } = options;
+export function createNexusEngineEditorRuntime(options = {}) {
+  const { state, root = null, canvas = null, NexusEngine: suppliedModule = null, source = "fallback:local" } = options;
   const kitMutationMode = options.kitMutationMode === "cli" ? "cli" : "read-only";
-  const NexusRealtime = isNexusRealtimeModule(suppliedModule) ? suppliedModule : createFallbackNexusRealtime();
-  const runtimeSource = isNexusRealtimeModule(suppliedModule) ? source : "fallback:compatible-nexusrealtime";
+  const NexusEngine = isNexusEngineModule(suppliedModule) ? suppliedModule : createFallbackNexusEngine();
+  const runtimeSource = isNexusEngineModule(suppliedModule) ? source : "fallback:compatible-nexusengine";
   const kits = createEditorRuntimeKits({
-    NexusRealtime,
+    NexusEngine,
     state,
     kitMutationMode,
     recordEvent: (type, payload) => options.recordEvent?.(type, payload)
   });
-  const composer = NexusRealtime.createGameKitComposer({ kits });
-  const engine = NexusRealtime.createRealtimeGame({ kits: composer.kits, composer, root, canvas });
+  const composer = NexusEngine.createGameKitComposer({ kits });
+  const engine = NexusEngine.createRealtimeGame({ kits: composer.kits, composer, root, canvas });
   const bindings = composer.bindings ?? engine.game?.bindings ?? {};
 
   return {

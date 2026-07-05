@@ -12,7 +12,7 @@ import {
   validateSequenceLinks
 } from "../src/editor-domain-model.js";
 import { createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js";
-import { createNexusRealtimeEditorRuntime } from "../src/nexus-realtime-editor-runtime.js";
+import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 
 const OPERATIONS = Object.freeze({
   "install-kit": {
@@ -193,7 +193,7 @@ Examples:
 
 async function createContext(flags = {}) {
   const state = createEditorState();
-  state.editorRuntime = createNexusRealtimeEditorRuntime({
+  state.editorRuntime = createNexusEngineEditorRuntime({
     state,
     kitMutationMode: "cli",
     recordEvent: (type, payload) => recordEditorEvent(state, type, payload)

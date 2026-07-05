@@ -115,7 +115,7 @@ Object-level component:
 
 - Do not build a physics engine for picking.
 - Do not introduce external rendering dependencies.
-- Do not move renderer, DOM, Canvas, or browser event wiring into reusable NexusRealtime core logic.
+- Do not move renderer, DOM, Canvas, or browser event wiring into reusable NexusEngine core logic.
 - Do not start Loop 4 until the implemented CLI-only/runtime-interaction workflow is reviewed and accepted.
 
 ## Implementation Notes

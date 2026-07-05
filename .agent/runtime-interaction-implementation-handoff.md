@@ -19,7 +19,7 @@ Give the next implementation pass a file-level checklist for Goal Packet 021 wit
 | --- | --- | --- |
 | `src/editor-domain-model.js` | Owns game templates, target scene stamping, export model | Add `runtimeClickable` component stamping and `scene3d.runtimeInteraction` state; add second small interaction template. |
 | `src/dsk-html-builder.js` | Owns generated single-file HTML runtime | Replace target-only click runtime with generic interaction runtime; keep target aliases during migration. |
-| `src/nexus-realtime-editor-runtime.js` | Composes editor runtime kits | Add `editor-runtime-interaction-kit` binding/metadata if runtime interaction needs editor-side APIs. |
+| `src/nexus-engine-editor-runtime.js` | Composes editor runtime kits | Add `editor-runtime-interaction-kit` binding/metadata if runtime interaction needs editor-side APIs. |
 | `src/kits/editor-kits.js` | Lists editor kit descriptors and state defaults | Add visible/editor descriptor if the kit should appear in editor kit registry/counts. |
 | `scripts/nexus-engine-editor-cli.mjs` | Exposes CLI operation surface | Add optional convenience operation for the second interaction game if generic `game-template` is not enough. |
 | `scripts/intent-smoke.mjs` | Headless proof | Add manifest/export assertions for generic interaction state and compatibility aliases. |

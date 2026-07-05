@@ -4,7 +4,7 @@ Status: active
 
 ## Objective
 
-Correct the Domain Stack Add Kit flow so users immediately see a NexusRealtime/ProtoKits-style registry dropdown with sub-domains before installing a kit.
+Correct the Domain Stack Add Kit flow so users immediately see a NexusEngine/ProtoKits-style registry dropdown with sub-domains before installing a kit.
 
 ## Scope
 

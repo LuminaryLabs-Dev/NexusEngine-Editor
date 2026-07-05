@@ -1,6 +1,6 @@
 # NexusEngine Editor
 
-Static viewport-first 3D web editor for Nexus Engine / NexusRealtime DSK projects.
+Static viewport-first 3D web editor for Nexus Engine DSK projects.
 
 The 3D scene viewport is primary. The editor starts with a grid, default cube, camera marker, transform gizmo, and three compact docked overlay panels:
 
@@ -9,6 +9,14 @@ The 3D scene viewport is primary. The editor starts with a grid, default cube, c
 - Sequence Timeline - docked bottom; add steps, link source kit events to target kit outputs from installed kit manifests, and run kit-driven sequences with retained receipts.
 
 The command strip can play the sequence, create a new starter project, save and load a versioned project snapshot in browser storage, and build a single-file HTML game export with configurable canvas runtime budgets, render stats, game-template metadata, visible sequence playback controls, and `runSequence()` receipts. Selecting `n:persistence` in the Domain Stack exposes portable `.project.json` export/import controls for moving large scenes and kit graphs between sessions or browsers.
+
+The editor loads NexusEngine `0.0.3` from jsDelivr by default:
+
+```txt
+https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@0.0.3/src/index.js
+```
+
+If the CDN module is unavailable, the editor uses a local compatible composer so the static editor still runs. Required editor features are mapped through `editor-feature-contracts-kit`, which records the owning local editor kit, reused ProtoKit/Core source, required tokens, and provided tokens for each feature in exported manifests.
 
 The same model/runtime can be driven from the terminal through the NexusGameKit-Link-style CLI:
 

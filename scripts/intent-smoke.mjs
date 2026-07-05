@@ -3,9 +3,10 @@ import { EDITOR_KITS, createEditorState, recordEditorEvent } from "../src/kits/e
 import { DEFAULT_DSK_GAME, buildDskGameHtml, createDskGameFileName, normalizeDskGameManifest } from "../src/dsk-html-builder.js";
 import { addSequenceStep, appendDomainKit, appendSceneObject, appendSceneObjectGroup, appendScenePreset, buildDomainStackHealth, buildEditorExportManifest, buildSceneObjectStats, createEditorProjectFileName, deleteSceneObject, duplicateSceneObject, filterDomainStack, filterSceneObjects, listGameAuthoringTemplates, listSceneAuthoringPresets, normalizeBuildRuntimeConfig, listSequenceEventOptions, normalizeViewportRuntimeConfig, selectSceneObject, updateSceneObjectTransform, updateSequenceStepLink, validateSequenceLinks } from "../src/editor-domain-model.js";
 import { createEditorKitInstallSurface, normalizeKitManifest } from "../src/editor-kit-registry.js";
-import { createNexusRealtimeEditorRuntime } from "../src/nexus-realtime-editor-runtime.js";
+import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
+import { validateEditorFeatureContracts } from "../src/kits/editor-feature-contracts-kit/index.js";
 
-assert.equal(EDITOR_KITS.length, 13);
+assert.equal(EDITOR_KITS.length, 14);
 assert.ok(EDITOR_KITS.every((kit) => kit.id.startsWith("editor-") && kit.id.endsWith("-kit")));
 for (const expected of [
   "n:editor",
@@ -20,13 +21,33 @@ for (const expected of [
   "n:runtime:interaction",
   "n:editor:persistence",
   "n:editor:selection",
+  "n:editor:feature-contracts",
   "n:editor:status"
 ]) {
   assert.ok(EDITOR_KITS.some((kit) => kit.domainPath === expected), `missing ${expected}`);
 }
 
+const requiredFeatureContracts = [
+  "top-command-strip",
+  "domain-stack-panel",
+  "registry-kit-picker",
+  "cli-only-kit-install",
+  "webgl-viewport",
+  "viewport-transform-tools",
+  "scene-object-authoring",
+  "configure-panel",
+  "scene-presets",
+  "game-template-authoring",
+  "sequence-timeline",
+  "project-persistence",
+  "html-build-export",
+  "runtime-interactions",
+  "screenshot-mcp"
+];
+assert.equal(validateEditorFeatureContracts(requiredFeatureContracts).ok, true);
+
 const readOnlyState = createEditorState();
-readOnlyState.editorRuntime = createNexusRealtimeEditorRuntime({
+readOnlyState.editorRuntime = createNexusEngineEditorRuntime({
   state: readOnlyState,
   recordEvent: (type, payload) => recordEditorEvent(readOnlyState, type, payload)
 });
@@ -37,7 +58,7 @@ assert.throws(() => readOnlyState.editorRuntime.getBinding("kitInstaller").insta
 assert.throws(() => readOnlyState.editorRuntime.getBinding("gameTemplate").apply(), /CLI-only/);
 
 const state = createEditorState();
-state.editorRuntime = createNexusRealtimeEditorRuntime({
+state.editorRuntime = createNexusEngineEditorRuntime({
   state,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(state, type, payload)
@@ -45,6 +66,7 @@ state.editorRuntime = createNexusRealtimeEditorRuntime({
 assert.equal(state.editorRuntime.kitMutationMode, "cli");
 assert.deepEqual(state.editorRuntime.installOrder, [
   "editor-composition-kit",
+  "editor-feature-contracts-kit",
   "editor-kit-registry-kit",
   "editor-kit-installer-kit",
   "editor-domain-stack-kit",
@@ -57,8 +79,9 @@ assert.deepEqual(state.editorRuntime.installOrder, [
   "editor-project-persistence-kit",
   "editor-html-build-kit"
 ]);
-assert.equal(state.editorRuntime.source, "fallback:compatible-nexusrealtime");
+assert.equal(state.editorRuntime.source, "fallback:compatible-nexusengine");
 assert.equal(typeof state.editorRuntime.getBinding("composition").assignDomainKit, "function");
+assert.equal(state.editorRuntime.getBinding("featureContracts").validate(requiredFeatureContracts).ok, true);
 assert.equal(typeof state.editorRuntime.getBinding("kitRegistry").search, "function");
 assert.equal(typeof state.editorRuntime.getBinding("kitInstaller").installKit, "function");
 assert.equal(typeof state.editorRuntime.getBinding("domainStack").getHealth, "function");
@@ -73,7 +96,7 @@ assert.equal(typeof state.editorRuntime.getBinding("runtimeInteraction").getStat
 assert.equal(typeof state.editorRuntime.getBinding("viewportTools").setTool, "function");
 assert.equal(typeof state.editorRuntime.getBinding("viewportTools").nudge, "function");
 const resetState = createEditorState();
-resetState.editorRuntime = createNexusRealtimeEditorRuntime({
+resetState.editorRuntime = createNexusEngineEditorRuntime({
   state: resetState,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(resetState, type, payload)
@@ -86,7 +109,8 @@ assert.equal(resetState.mode, "stopped");
 assert.equal(resetState.projectPersistence.status, "reset");
 assert.equal(resetState.project.scene3d.objects.length, 1);
 recordEditorEvent(state, "editor.smoke", { domainPath: "n:editor:status" });
-assert.equal(state.events.length, 1);
+assert.ok(state.events.some((event) => event.type === "editor.feature-contracts.validated"));
+assert.ok(state.events.some((event) => event.type === "editor.smoke"));
 assert.equal(state.kitRegistry.get("n:editor:viewport").role, "full-3d-scene-viewport");
 assert.equal(state.selectedDomainPath, "n:physics");
 assert.equal(state.project.scene3d.objects[0].label, "Default Cube");
@@ -183,7 +207,7 @@ assert.equal(state.project.scene3d.objects[1].components.physics.domainPath, "n:
 
 assert.ok(listSceneAuthoringPresets().some((preset) => preset.id === "physics-stress-grid-preset"));
 const presetState = createEditorState();
-presetState.editorRuntime = createNexusRealtimeEditorRuntime({
+presetState.editorRuntime = createNexusEngineEditorRuntime({
   state: presetState,
   recordEvent: (type, payload) => recordEditorEvent(presetState, type, payload)
 });
@@ -214,7 +238,7 @@ assert.ok(listGameAuthoringTemplates().some((template) => template.id === "targe
 assert.ok(listGameAuthoringTemplates().some((template) => template.id === "gem-collector-template"));
 assert.ok(listGameAuthoringTemplates().some((template) => template.id === "streaming-terrain-cargo-template"));
 const chessState = createEditorState();
-chessState.editorRuntime = createNexusRealtimeEditorRuntime({
+chessState.editorRuntime = createNexusEngineEditorRuntime({
   state: chessState,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(chessState, type, payload)
@@ -252,7 +276,7 @@ assert.equal(chessManifest.scene3d.gameTemplates[0].templateId, "chess-board-tem
 assert.match(buildDskGameHtml(chessManifest), /Nexus Chess/);
 assert.match(buildDskGameHtml(chessManifest), /White King e1/);
 const targetState = createEditorState();
-targetState.editorRuntime = createNexusRealtimeEditorRuntime({
+targetState.editorRuntime = createNexusEngineEditorRuntime({
   state: targetState,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(targetState, type, payload)
@@ -297,7 +321,7 @@ assert.match(targetHtml, /handleRuntimePointer/);
 assert.match(targetHtml, /recordTargetHit/);
 
 const gemState = createEditorState();
-gemState.editorRuntime = createNexusRealtimeEditorRuntime({
+gemState.editorRuntime = createNexusEngineEditorRuntime({
   state: gemState,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(gemState, type, payload)
@@ -323,7 +347,7 @@ assert.match(gemHtml, /Runtime Interactions/);
 assert.match(gemHtml, /recordInteractionHit/);
 assert.match(gemHtml, /resetInteractions/);
 const templateState = createEditorState();
-templateState.editorRuntime = createNexusRealtimeEditorRuntime({
+templateState.editorRuntime = createNexusEngineEditorRuntime({
   state: templateState,
   kitMutationMode: "cli",
   recordEvent: (type, payload) => recordEditorEvent(templateState, type, payload)
@@ -407,6 +431,9 @@ assert.equal(manifest.domainPath, "n:game:starter");
 assert.equal(manifest.viewport.mode, "3d");
 assert.equal(manifest.domainStackHealth.ok, false);
 assert.ok(manifest.domainStackHealth.missingCount > 0);
+assert.equal(manifest.featureContractValidation.ok, true);
+assert.equal(manifest.featureContracts.length, requiredFeatureContracts.length);
+assert.ok(manifest.featureContracts.some((contract) => contract.featureId === "webgl-viewport" && contract.owningKitId === "editor-viewport-kit"));
 assert.equal(manifest.sequenceGraph.ok, true);
 assert.equal(manifest.scene3d.objects[0].type, "mesh:cube");
 assert.equal(manifest.scene3d.objects.length, 277);
@@ -432,6 +459,8 @@ assert.match(html, /sequenceReceipts/);
 assert.match(html, /runtime-run-sequence/);
 assert.match(html, /runtime-receipts/);
 assert.match(html, /Sequence Playback/);
+assert.match(html, /featureContracts/);
+assert.match(html, /editor-viewport-kit/);
 assert.match(buildDskGameHtml(presetManifest), /Physics Stress Grid/);
 assert.match(buildDskGameHtml(presetManifest), /Authoring Presets/);
 assert.match(buildDskGameHtml(presetManifest), /max draw 600/);

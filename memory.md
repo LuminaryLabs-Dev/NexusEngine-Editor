@@ -10,6 +10,7 @@ Architecture shape:
 - `src/editor-domain-model.js` owns the editable 3D scene, domain stack, kit config, and sequence timeline model.
 - `src/viewport-webgl.js` owns the dependency-free WebGL viewport renderer for grid, axes, default cube, and play-mode animation.
 - `src/kits/editor-kits.js` owns editor kit descriptors and lightweight state.
+- `src/kits/editor-feature-contracts-kit/index.js` owns the required editor feature contract map, including owning local kit, reused ProtoKit/Core source, required tokens, and provided tokens.
 - `src/dsk-html-builder.js` owns the shared browser/Node builder for single-file DSK-driven game HTML.
 - `scripts/build-static-site.mjs` creates the GitHub Pages artifact in `dist/`.
 - `.github/workflows/deploy-editor.yml` runs tests and deploys `dist/` from `main` using GitHub Pages Actions.
@@ -21,7 +22,9 @@ Conventions:
 - The first view should read as a 3D engine editor: grid, default cube, transform gizmo, camera/light markers, and no landing-page/hero copy.
 - Domain Stack, Configure, and Sequence Timeline are docked overlays anchored top-left, top-right, and bottom; they expand inward and must not restore old free-floating positions.
 - Left panel is the Domain Stack for adding/reordering/stringing kits; right panel configures the selected kit/object; bottom panel sequences and links kit events.
-- Kit install is CLI-only: the editor exposes NexusRealtime/ProtoKits-style kit manifests through search, category filtering, a dropdown selector, and copyable CLI commands, but browser install buttons do not mutate the kit graph.
+- Kit install is CLI-only: the editor exposes NexusEngine/ProtoKits-style kit manifests through search, category filtering, a dropdown selector, and copyable CLI commands, but browser install buttons do not mutate the kit graph.
+- The browser editor loads NexusEngine `0.0.3` from `https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@0.0.3/src/index.js` when available, and falls back to the local compatible composer only to keep the static editor usable when remote import fails.
+- Every required editor capability should be represented in `editor-feature-contracts-kit` and exported through `featureContracts` plus `featureContractValidation` in generated game manifests.
 - Browser runtimes use `kitMutationMode: "read-only"` and reject direct registry install calls; CLI contexts explicitly opt into `kitMutationMode: "cli"` for `install-kit` operations.
 - Game templates that install kits are also CLI-only in browser runtimes; the browser may show the selected template and command, but only the CLI may apply kit-mutating templates.
 - The Domain Stack shows the Registry Kit dropdown by default; search/category filters are secondary controls below the selector.

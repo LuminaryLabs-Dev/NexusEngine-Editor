@@ -14,7 +14,7 @@ Status: active
 - 2026-06-30 21:23:42 America/New_York - Added goal packet `002-draggable-panels-and-scene-scale.md` for draggable overlays and multi-object scene authoring.
 - 2026-06-30 21:23:42 America/New_York - Implemented draggable overlay panels with editor-state positions.
 - 2026-06-30 21:23:42 America/New_York - Added multi-object scene authoring: add/select cube objects, edit transforms, render all objects in WebGL, and preserve them in HTML export.
-- 2026-06-30 22:09:25 America/New_York - Added goal packet `003-registry-backed-kit-picker.md` and feedback packet `002-registry-backed-kit-picker.md` for the NexusRealtime registry-backed Add Kit flow.
+- 2026-06-30 22:09:25 America/New_York - Added goal packet `003-registry-backed-kit-picker.md` and feedback packet `002-registry-backed-kit-picker.md` for the NexusEngine registry-backed Add Kit flow.
 - 2026-06-30 22:09:25 America/New_York - Implemented a registry/dropdown kit picker, installer actions, dependency/sub-kit display, and export metadata preservation.
 - 2026-06-30 22:20:40 America/New_York - Added goal packet `004-scalable-domain-stack-health-map.md` for large-game Domain Stack scale controls.
 - 2026-06-30 22:20:40 America/New_York - Implemented installed-kit filtering, Stack/Map views, dependency health, and `domainStackHealth` export metadata.
@@ -55,3 +55,4 @@ Status: active
 - 2026-07-01 06:53:52 EDT - Implemented Goal Packet 021 with `editor-runtime-interaction-kit`, generic `runtimeClickable` exports, Gem Collector proof, browser-blocked kit-mutating templates, and MCP `editor_cli_game_screenshot` validation.
 - 2026-07-01 06:55:00 EDT - Added `runtime-interaction-implementation-handoff.md` and `runtime-interaction-validation-matrix.md` to map Goal Packet 021 to source files, implementation sequence, proof surfaces, and screenshot artifacts.
 - 2026-07-01 07:07:39 EDT - Revalidated a UI-only Platform Run loop after CLI-only kit mutation, fixed `New` reset to stop stale play mode, captured `.agent/screenshots/ui-only-platform-run-loop.png`, and passed `npm test`.
+- 2026-07-05 00:00:00 EDT - Added `editor-feature-contracts-kit`, NexusEngine `0.0.3` CDN loading, and manifest-level feature contract validation for required editor capabilities.

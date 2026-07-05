@@ -8,7 +8,7 @@ Status: complete
 
 ## Objective Audited
 
-Test NexusEngine Editor in repeated UI-only game build/save/delete loops using NexusRealtime kits. Fix broken features inside `NexusEngine-Editor`, add CLI/MCP capability as needed, document progress in `.agent`, stop building after three turns/loops, document the blocker, and keep the full goal active until current evidence proves completion.
+Test NexusEngine Editor in repeated UI-only game build/save/delete loops using NexusEngine-style Domain Service Kits. Fix broken features inside `NexusEngine-Editor`, add CLI/MCP capability as needed, document progress in `.agent`, stop building after three turns/loops, document the blocker, and keep the full goal active until current evidence proves completion.
 
 ## Current Conclusion
 
@@ -21,7 +21,7 @@ The reusable interaction-runtime blocker is implemented and locally validated. A
 | Requirement | Current Evidence | Audit Result |
 | --- | --- | --- |
 | Work only inside `NexusEngine-Editor` | Current artifacts and docs are under this repo. | Proved for current pass |
-| Use NexusRealtime kits | Runtime and docs use editor kits, Domain Service Kits, kit registry, and NexusRealtime-style composition. | Proved for current pass |
+| Use NexusEngine kits | Runtime and docs use editor kits, Domain Service Kits, kit registry, and NexusEngine-style composition. | Proved for current pass |
 | Choose a simple game idea | Loop 1 Chess, Loop 2 Target Clicker, Loop 3 control-surface hardening are recorded. | Proved for first three loops |
 | Identify kits needed | `game-loop-progress.md` lists kits/tooling per loop. | Proved |
 | Assess CLI/MCP capability | Loop records and retrospective list CLI/MCP capability. | Proved |
@@ -80,7 +80,7 @@ Browser kit-mutating authoring is now CLI-only:
 ## Final Completion Check
 
 - Work stayed inside `NexusEngine-Editor`.
-- NexusRealtime-style kits own the behavior.
+- NexusEngine-style kits own the behavior.
 - Three loops and the post-021 UI-only revalidation are documented in `.agent`.
 - The largest blocker was identified, implemented, and validated.
 - Browser kit mutation is CLI-only, as requested.

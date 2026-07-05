@@ -4,7 +4,7 @@ Status: active
 
 ## Objective
 
-Replace blind `+ Kit` insertion with a NexusRealtime ProtoKits-style registry and installer flow.
+Replace blind `+ Kit` insertion with a NexusEngine ProtoKits-style registry and installer flow.
 
 ## Target Experience
 
