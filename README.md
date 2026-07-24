@@ -47,6 +47,7 @@ npm run cli:chess
 npm run cli:target-clicker
 npm run cli:gem-collector
 npm run mcp:screenshot
+npm run mcp:game
 ```
 
 `npm run cli:chess` creates a DSK-driven chess project and single-file game export at `dist/games/nexus-chess.html` plus `dist/games/nexus-chess.project.json`. The chess template is engine data: 64 square objects, 32 piece objects, a `n:game:chess` rules kit, and kit-linked sequence steps.
@@ -59,7 +60,10 @@ Code and registry-package installation is intentionally CLI-only. Browser runtim
 
 `playable-export` is the exact-game export path for projects carrying `nexusengine.playable-project/1`. It copies the local runtime into a new or empty standalone folder, rejects symlinks and source/output nesting, omits authoring evidence and project-only files, and writes `nexus-playable-export.json` with project, contract, and content fingerprints. Manifest-only templates continue using the single-file DSK HTML builder.
 
-`npm run mcp:screenshot` starts a stdio JSON-RPC MCP-style screenshot service. Captures are written under `.agent/screenshots/`.
+`npm run mcp:screenshot` starts a standards-compliant stdio MCP server through
+the optional NexusEngine MCP Domain Service Kit. Captures are written under
+`.agent/screenshots/`. File-writing tools fail closed unless
+`NEXUS_EDITOR_MCP_ALLOW_WRITES=1` is present in the server process.
 
 Screenshot MCP tools:
 
@@ -70,6 +74,12 @@ Screenshot MCP tools:
 - `editor_click_screenshot` - open a URL, click a selector or coordinate, then capture status plus screenshot.
 - `editor_human_view_diagnostic` - screenshot-backed checks for viewport visibility, docked panels, CLI-only kit install, and loaded manifest.
 - `editor_cli_game_screenshot` - run a CLI game/template operation, open the generated HTML, optionally click it, and return screenshot-backed status.
+
+`npm run mcp:game` is a separate opted-in game runtime proof. It installs the
+MCP DSK and exposes only `game_status`, `game_step`, `nexus-game://state`, and
+the `play_example_game` prompt. `game_step` requires
+`NEXUS_GAME_MCP_ALLOW_ACTIONS=1`. Existing Editor exports and games do not
+install the MCP DSK and therefore receive no MCP runtime surface.
 
 Core commands:
 

@@ -12,11 +12,18 @@
     "cli:target-clicker": "node scripts/nexus-engine-editor-cli.mjs operations submit target-clicker-game --param html=dist/games/nexus-target-clicker.html --param project=dist/games/nexus-target-clicker.project.json",
     "cli:gem-collector": "node scripts/nexus-engine-editor-cli.mjs operations submit gem-collector-game --param html=dist/games/nexus-gem-collector.html --param project=dist/games/nexus-gem-collector.project.json",
     "mcp:screenshot": "node scripts/nexus-engine-editor-screenshot-mcp.mjs",
+    "mcp:game": "node examples/mcp-game-runtime.mjs",
     "smoke:intent": "node scripts/intent-smoke.mjs",
     "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
     "test": "npm run smoke:intent && npm run build && npm run smoke:playwright"
   },
   "devDependencies": {
-    "playwright": "^1.61.1"
+    "@luminarylabs/nexusengine-kits": "github:LuminaryLabs-Dev/NexusEngine-Kits#770137b",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "playwright": "^1.61.1",
+    "zod": "^4.4.3"
+  },
+  "overrides": {
+    "@hono/node-server": "2.0.11"
   }
 }

@@ -3,9 +3,14 @@ import { execFile } from "node:child_process";
 import { readFile, stat, mkdir } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, relative, resolve, sep } from "node:path";
-import readline from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { createRealtimeGame } from "nexusengine";
+import {
+  createMcpDomainKit,
+  defineMcpProvider
+} from "@luminarylabs/nexusengine-kits/mcp-domain-kit";
+import { connectMcpStdio } from "@luminarylabs/nexusengine-kits/mcp/node";
 import { chromium } from "playwright";
 
 const DEFAULT_URL = "http://127.0.0.1:4174/?run=small-game-loop-2";
@@ -14,6 +19,14 @@ const DEFAULT_MCP_OUTPUT_DIR = ".agent/mcp-output";
 const EDITOR_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const execFileAsync = promisify(execFile);
 const CLI_SCREENSHOT_OPERATIONS = new Set(["chess-game", "target-clicker-game", "gem-collector-game", "game-template"]);
+const WRITE_TOOLS = new Set([
+  "editor_playable_export",
+  "editor_screenshot",
+  "editor_visual_status",
+  "editor_click_screenshot",
+  "editor_human_view_diagnostic",
+  "editor_cli_game_screenshot"
+]);
 
 const TOOLS = Object.freeze([
   {
@@ -119,25 +132,6 @@ const TOOLS = Object.freeze([
     }
   }
 ]);
-
-function writeJson(message) {
-  process.stdout.write(`${JSON.stringify(message)}\n`);
-}
-
-function response(id, result) {
-  writeJson({ jsonrpc: "2.0", id, result });
-}
-
-function errorResponse(id, error) {
-  writeJson({
-    jsonrpc: "2.0",
-    id,
-    error: {
-      code: -32000,
-      message: error instanceof Error ? error.message : String(error)
-    }
-  });
-}
 
 function timestampSlug() {
   return new Date().toISOString().replace(/[:.]/g, "-");
@@ -292,17 +286,34 @@ async function inspectPage(page) {
         return {};
       }
     })();
-    const viewport = rectFor(".editor-viewport");
-    const domainStack = rectFor('[data-panel="domainStack"]');
-    const configure = rectFor('[data-panel="configure"]');
-    const sequence = rectFor('[data-panel="sequence"]');
+    const viewport = rectFor(".viewport-pane");
+    const domainStack = rectFor(".composer-panel");
+    const configure = rectFor(".configure-panel");
+    const sequence = rectFor(".sequence-panel");
     const installButtons = Array.from(document.querySelectorAll("#install-kit, #install-bundle, [data-install-kit]"));
     const cliInstallCommand = document.querySelector(".kit-picker-actions code")?.textContent?.trim() ?? "";
     const runtime = window.__NEXUS_EDITOR_RUNTIME__ ?? {};
+    const composition = window.__NEXUS_COMPOSITION__ ?? {};
     const bodyText = document.body.innerText.split("\n").map((line) => line.trim()).filter(Boolean);
-    const domainDocked = Boolean(viewport && domainStack && domainStack.left - viewport.left < 100 && domainStack.top - viewport.top < 140);
-    const configureDocked = Boolean(viewport && configure && viewport.right - configure.right < 160 && configure.top - viewport.top < 180);
-    const sequenceDocked = Boolean(viewport && sequence && viewport.bottom - sequence.bottom < 120);
+    const dockingTolerance = 48;
+    const domainDocked = Boolean(
+      viewport
+      && domainStack
+      && domainStack.right <= viewport.left + dockingTolerance
+      && Math.abs(domainStack.right - viewport.left) <= dockingTolerance
+    );
+    const configureDocked = Boolean(
+      viewport
+      && configure
+      && configure.left >= viewport.right - dockingTolerance
+      && Math.abs(configure.left - viewport.right) <= dockingTolerance
+    );
+    const sequenceDocked = Boolean(
+      viewport
+      && sequence
+      && sequence.top >= viewport.bottom - dockingTolerance
+      && Math.abs(sequence.top - viewport.bottom) <= dockingTolerance
+    );
     return {
       title: document.title,
       bodyText: bodyText.slice(0, 60),
@@ -319,6 +330,11 @@ async function inspectPage(page) {
         kitMutationMode: runtime.kitMutationMode,
         installOrder: runtime.installOrder ?? [],
         bindings: runtime.bindings ?? []
+      },
+      composition: {
+        supported: composition.supported === true,
+        validationOk: composition.validation?.ok === true,
+        source: composition.source ?? null
       },
       docking: {
         domainStack: domainDocked,
@@ -390,13 +406,13 @@ async function humanViewDiagnostic(input = {}) {
     },
     {
       id: "kit-install-cli-only",
-      ok: Boolean(!status.registry.hasInstallButtons && status.registry.cliInstallCommand.includes("operations submit install-kit") && status.runtime.kitMutationMode === "read-only"),
-      detail: status.registry.cliInstallCommand || "missing CLI command"
+      ok: Boolean(!status.registry.hasInstallButtons && status.runtime.kitMutationMode === "read-only"),
+      detail: status.registry.cliInstallCommand || `runtime mode: ${status.runtime.kitMutationMode ?? "missing"}`
     },
     {
-      id: "manifest-loaded",
-      ok: Boolean(status.manifest.domainPath && status.manifest.objectCount >= 1),
-      detail: `${status.manifest.domainPath || "missing"} · ${status.manifest.objectCount} objects`
+      id: "composition-ready",
+      ok: Boolean(status.composition.supported && status.composition.validationOk && status.manifest.domainPath && status.manifest.objectCount >= 1),
+      detail: `${status.composition.source ?? "missing source"} · ${status.manifest.domainPath || "missing"} · ${status.manifest.objectCount} objects`
     }
   ];
   return {
@@ -433,7 +449,7 @@ async function cliGameScreenshot(input = {}) {
   if (input.count !== undefined) args.push("--param", `count=${Math.floor(Number(input.count))}`);
 
   const { stdout, stderr } = await execFileAsync(process.execPath, args, {
-    cwd: process.cwd(),
+    cwd: EDITOR_ROOT,
     maxBuffer: 10 * 1024 * 1024
   });
   const report = JSON.parse(stdout);
@@ -494,43 +510,72 @@ async function callTool(name, input = {}) {
   throw new Error(`Unknown tool: ${name}`);
 }
 
-async function handle(message) {
-  if (message.method === "initialize") {
-    response(message.id, {
-      protocolVersion: "2024-11-05",
-      serverInfo: {
-        name: "nexusengine-editor-screenshot-mcp",
-        version: "0.1.0"
+const editorProvider = defineMcpProvider({
+  id: "nexusengine-editor",
+  version: "0.2.0",
+  tools: TOOLS.map((tool) => {
+    const writesFiles = WRITE_TOOLS.has(tool.name);
+    return {
+      ...tool,
+      approval: writesFiles ? "required" : "none",
+      annotations: {
+        readOnlyHint: !writesFiles,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
       },
-      capabilities: {
-        tools: {}
+      handler: (input) => callTool(tool.name, input)
+    };
+  }),
+  resources: [{
+    name: "editor-capabilities",
+    uri: "nexus-editor://capabilities",
+    title: "NexusEngine Editor MCP Capabilities",
+    description: "The explicit tools and write policy exposed by this Editor process.",
+    read: () => ({
+      schemaVersion: "nexusengine.editor.mcp-capabilities.v1",
+      providerId: "nexusengine-editor",
+      tools: TOOLS.map(({ name, description }) => ({
+        name,
+        description,
+        writesFiles: WRITE_TOOLS.has(name)
+      })),
+      writeApproval: {
+        environmentVariable: "NEXUS_EDITOR_MCP_ALLOW_WRITES",
+        requiredValue: "1"
       }
-    });
-    return;
-  }
-  if (message.method === "tools/list") {
-    response(message.id, { tools: TOOLS });
-    return;
-  }
-  if (message.method === "tools/call") {
-    const result = await callTool(message.params?.name, message.params?.arguments ?? {});
-    response(message.id, result);
-    return;
-  }
-  if (message.id !== undefined) response(message.id, {});
-}
+    })
+  }],
+  prompts: [{
+    name: "editor_visual_review",
+    title: "Review NexusEngine Editor",
+    description: "Inspect the Editor through screenshot-backed visual diagnostics.",
+    arguments: [{
+      name: "url",
+      description: "Editor URL to review.",
+      required: false
+    }],
+    render: ({ url }) => ({
+      messages: [{
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review the NexusEngine Editor${url ? ` at ${url}` : ""}. Read nexus-editor://capabilities, then use editor_human_view_diagnostic. Report failed checks before proposing one focused correction.`
+        }
+      }]
+    })
+  }]
+});
 
-const rl = readline.createInterface({ input: process.stdin, crlfDelay: Infinity });
-for await (const line of rl) {
-  if (!line.trim()) continue;
-  try {
-    await handle(JSON.parse(line));
-  } catch (error) {
-    try {
-      const parsed = JSON.parse(line);
-      errorResponse(parsed.id, error);
-    } catch {
-      errorResponse(null, error);
-    }
-  }
-}
+const mcpEngine = createRealtimeGame({
+  coreKits: false,
+  kits: [createMcpDomainKit({ providers: [editorProvider] })]
+});
+
+await connectMcpStdio({
+  mcp: mcpEngine.n.mcp,
+  name: "nexusengine-editor",
+  version: "0.2.0",
+  instructions: "Read nexus-editor://capabilities before calling tools. File-writing tools require NEXUS_EDITOR_MCP_ALLOW_WRITES=1.",
+  authorize: ({ tool }) => !WRITE_TOOLS.has(tool.name) || process.env.NEXUS_EDITOR_MCP_ALLOW_WRITES === "1"
+});

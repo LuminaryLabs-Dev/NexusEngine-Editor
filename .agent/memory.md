@@ -41,8 +41,9 @@ Status: active
 - Game Template controls stay in the Scene Inspector as a compact selector plus `Make Game`, preserving the viewport-first workspace.
 - CLI control follows the NexusGameKit-Link pattern: `scripts/nexus-engine-editor-cli.mjs` exposes status, interactive, and operation commands over the same editor runtime bindings.
 - Exact generated-game export is a CLI/MCP folder operation: `playable-export` copies the accepted local runtime into a new or empty destination outside its source tree, omits authoring-only evidence/project files, rejects symlinks, and records content fingerprints. It never substitutes the generic DSK diagnostics page for a declared playable project.
-- Screenshot validation is exposed through `scripts/nexus-engine-editor-screenshot-mcp.mjs`, a stdio MCP-style service with Playwright-backed screenshot, visual-status, click-and-screenshot, and human-view diagnostic tools.
+- Screenshot validation is exposed through `scripts/nexus-engine-editor-screenshot-mcp.mjs`, a standards-compliant stdio server built from the optional NexusEngine MCP DSK and official SDK adapter. It exposes only explicit Editor tools and fails closed on file writes without `NEXUS_EDITOR_MCP_ALLOW_WRITES=1`.
 - MCP project status and playable export delegate to the same CLI model and exporter, then use Playwright only for standalone Human View proof.
+- MCP remains opt-in per application. Existing Editor exports and games have no MCP runtime surface unless they explicitly install the DSK and register a bounded provider.
 - Save and Load are owned by `editor-project-persistence-kit`; they persist versioned project snapshots to browser storage and restore large scenes, selections, panel positions, and filters.
 - New/reset is owned by `editor-project-persistence-kit`; it clears the browser snapshot and restores the starter scene for loop testing.
 - Project file export/import is owned by `n:persistence` / `editor-project-persistence-kit`; the Persistence Inspector exposes portable `.project.json` controls that preserve large scenes, selections, workspace state, kit graphs, and sequence receipts.

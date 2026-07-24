@@ -57,3 +57,5 @@ Status: active
 - 2026-07-01 07:07:39 EDT - Revalidated a UI-only Platform Run loop after CLI-only kit mutation, fixed `New` reset to stop stale play mode, captured `.agent/screenshots/ui-only-platform-run-loop.png`, and passed `npm test`.
 - 2026-07-05 00:00:00 EDT - Added `editor-feature-contracts-kit`, NexusEngine `0.0.3` CDN loading, and manifest-level feature contract validation for required editor capabilities.
 - 2026-07-19 04:09:22 EDT - Implemented Goal Packet 023: project `0.3.0`, registry-reference hierarchy, atomic Apply, reference protection, trusted disposable previews, compatibility exports, and sibling-Engine Playwright/Human View proof; release and CDN cutover remain gated.
+- 2026-07-24 12:22:38 EDT - Revalidated Goal Packet 023 against the NexusEngine Core Composition registry feature branch; intent, build, and Playwright smokes pass while release remains gated.
+- 2026-07-24 12:22:38 EDT - Replaced the custom screenshot protocol with the optional MCP DSK and official stdio transport, gated Editor writes, and added an explicitly opted-in game runtime proof with gated actions.
