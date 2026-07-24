@@ -1,6 +1,7 @@
 import { clone, installDomainKitManifest } from "./editor-domain-model.js";
 
 export const KIT_REGISTRY_VERSION = "0.1.0";
+export const EDITOR_REGISTRY_SCHEMA = "nexusengine.core-composition.registry/2";
 
 function asList(value) {
   if (value === undefined || value === null) return [];
@@ -28,11 +29,13 @@ export function normalizeKitManifest(input = {}) {
     domain,
     domainPath: input.domainPath ?? toDomainPath(domain, id),
     parentDomain: input.parentDomain ? String(input.parentDomain) : metadata.parentDomain ?? null,
+    parentDomainPath: input.parentDomainPath ? String(input.parentDomainPath) : metadata.parentDomainPath ?? null,
     category: String(input.category ?? metadata.category ?? input.parentDomain ?? "General"),
     label: String(input.label ?? metadata.label ?? id),
     subtitle: String(input.subtitle ?? metadata.purpose ?? input.type ?? "Domain Service Kit"),
     type: String(input.type ?? "atomic-domain-service-kit"),
     status: String(input.status ?? "experimental"),
+    apiVisibility: String(input.apiVisibility ?? input.visibility ?? "public"),
     factory: input.factory ? String(input.factory) : null,
     path: input.path ? String(input.path) : null,
     requires: asList(input.requires).map(String),
@@ -42,11 +45,64 @@ export function normalizeKitManifest(input = {}) {
     publicApi: asList(input.publicApi).map(String),
     descriptors: asList(input.descriptors).map(String),
     children: asList(input.children).map(String),
+    defaults: clone(input.defaults ?? input.config ?? {}),
+    settingsSchema: clone(input.settingsSchema ?? { type: "object", additionalProperties: true }),
+    preview: input.preview == null ? null : clone(input.preview),
+    source: clone(input.source ?? { registryId: "nexusengine-editor-registry", exportName: null, module: input.path ?? null, trusted: false }),
     rendererBoundary: { outputsDescriptors: false, ownsDom: false, ownsCanvas: false, ownsThreeObjects: false, ...(input.rendererBoundary ?? {}) },
     performance: { scalesWith: [], telemetry: [], degradationModes: [], ...(input.performance ?? {}) },
     snapshot: { supportsSnapshot: false, supportsReset: false, supportsLoadSnapshot: false, ...(input.snapshot ?? {}) },
     promotion: { level: input.status ?? "experimental", criteria: [], ...(input.promotion ?? {}) },
     metadata
+  };
+}
+
+export function createEditorRegistrySnapshot(manifests = NEXUS_ENGINE_KIT_MANIFESTS) {
+  const kits = asList(manifests).map(normalizeKitManifest);
+  const paths = new Set(kits.map((kit) => kit.domainPath));
+  const domains = [...paths].sort().map((domainPath) => {
+    const first = kits.find((kit) => kit.domainPath === domainPath);
+    const declaredParent = first?.parentDomainPath && paths.has(first.parentDomainPath) ? first.parentDomainPath : null;
+    return {
+      id: `editor-domain-${domainPath.replace(/^n:/, "").replace(/[^a-z0-9]+/gi, "-")}`,
+      domainPath,
+      parentDomainPath: declaredParent,
+      label: first?.label ?? domainPath,
+      status: first?.status ?? "experimental",
+      ownedMeaning: [first?.subtitle ?? `Editor registry meaning bounded by ${domainPath}.`],
+      forbiddenResponsibilities: ["browser lifecycle", "renderer implementation", "GPU device ownership"],
+      settingsSchema: { type: "object", additionalProperties: true },
+      sourceRegistryId: "nexusengine-editor-registry",
+      metadata: { editorRegistry: true }
+    };
+  });
+  const records = kits.map((kit) => ({
+    id: kit.id,
+    version: kit.version,
+    status: kit.status,
+    kind: kit.type,
+    domain: kit.domain,
+    domainPath: kit.domainPath,
+    parentDomainPath: domains.find((domain) => domain.domainPath === kit.domainPath)?.parentDomainPath ?? null,
+    apiVisibility: kit.apiVisibility,
+    requires: clone(kit.requires),
+    provides: clone(kit.provides),
+    composes: clone(kit.children),
+    defaults: clone(kit.defaults),
+    settingsSchema: clone(kit.settingsSchema),
+    preview: clone(kit.preview),
+    source: { registryId: "nexusengine-editor-registry", exportName: null, module: kit.path, trusted: false },
+    metadata: { label: kit.label, subtitle: kit.subtitle, category: kit.category, rendererBoundary: kit.rendererBoundary, performance: kit.performance }
+  }));
+  const contentHash = `editor-${JSON.stringify({ domains, records }).length.toString(16)}`;
+  return {
+    schema: EDITOR_REGISTRY_SCHEMA,
+    registryId: "nexusengine-editor-registry",
+    revision: 1,
+    sources: [{ registryId: "nexusengine-editor-registry", package: "@luminarylabs/nexusengine-editor", version: KIT_REGISTRY_VERSION, contentHash, trusted: false }],
+    domains,
+    kits: records,
+    bundles: []
   };
 }
 
@@ -134,6 +190,9 @@ export function createKitRegistry(manifests = []) {
     },
     snapshot() {
       return { version: KIT_REGISTRY_VERSION, kits: this.list() };
+    },
+    registrySnapshot() {
+      return createEditorRegistrySnapshot(this.list());
     }
   });
 }

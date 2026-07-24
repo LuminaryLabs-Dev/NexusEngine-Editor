@@ -1,8 +1,8 @@
-import { DEFAULT_EDITOR_PROJECT, buildEditorExportManifest, clone } from "./editor-domain-model.js";
+import { DEFAULT_EDITOR_PROJECT, buildEditorExportManifest, clone, createEditorProject } from "./editor-domain-model.js";
 
 const DOMAIN_PATH_PATTERN = /^n(?::[a-z][a-z0-9]*(?:-[a-z0-9]+)*)+$/;
 
-export const DEFAULT_DSK_GAME = Object.freeze(buildEditorExportManifest(DEFAULT_EDITOR_PROJECT));
+export const DEFAULT_DSK_GAME = Object.freeze(buildEditorExportManifest(createEditorProject(DEFAULT_EDITOR_PROJECT)));
 
 function asText(value, fallback) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;

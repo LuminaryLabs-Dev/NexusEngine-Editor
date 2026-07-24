@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import * as NexusEngine from "../../NexusEngine/src/index.js";
 import { EDITOR_KITS, createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js";
 import { DEFAULT_DSK_GAME, buildDskGameHtml, createDskGameFileName, normalizeDskGameManifest } from "../src/dsk-html-builder.js";
-import { addSequenceStep, appendDomainKit, appendSceneObject, appendSceneObjectGroup, appendScenePreset, buildDomainStackHealth, buildEditorExportManifest, buildSceneObjectStats, createEditorProjectFileName, deleteSceneObject, duplicateSceneObject, filterDomainStack, filterSceneObjects, listGameAuthoringTemplates, listSceneAuthoringPresets, normalizeBuildRuntimeConfig, listSequenceEventOptions, normalizeViewportRuntimeConfig, selectSceneObject, updateSceneObjectTransform, updateSequenceStepLink, validateSequenceLinks } from "../src/editor-domain-model.js";
-import { createEditorKitInstallSurface, normalizeKitManifest } from "../src/editor-kit-registry.js";
+import { addSequenceStep, appendDomainKit, appendSceneObject, appendSceneObjectGroup, appendScenePreset, buildDomainStackHealth, buildEditorExportManifest, buildSceneObjectStats, createEditorProject, createEditorProjectFileName, deleteSceneObject, duplicateSceneObject, filterDomainStack, filterSceneObjects, listGameAuthoringTemplates, listSceneAuthoringPresets, normalizeBuildRuntimeConfig, listSequenceEventOptions, normalizePlayableProject, normalizeViewportRuntimeConfig, selectSceneObject, updateSceneObjectTransform, updateSequenceStepLink, validateSequenceLinks } from "../src/editor-domain-model.js";
+import { createEditorKitInstallSurface, createEditorRegistrySnapshot, normalizeKitManifest } from "../src/editor-kit-registry.js";
+import { createCompositionController } from "../src/editor-composition.js";
 import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 import { validateEditorFeatureContracts } from "../src/kits/editor-feature-contracts-kit/index.js";
 
@@ -116,6 +122,107 @@ assert.equal(state.selectedDomainPath, "n:physics");
 assert.equal(state.project.scene3d.objects[0].label, "Default Cube");
 assert.ok(state.project.domainStack.some((domain) => domain.domainPath === "n:render:three"));
 assert.equal(state.project.sequenceSteps.length, 3);
+assert.equal(state.project.version, "0.3.0");
+assert.equal(state.project.composition.schema, "nexusengine.composition-tree/1");
+assert.equal(state.project.compositionRegistryOverlay.schema, "nexusengine.core-composition.registry/2");
+assert.equal(state.project.compositionRegistryOverlay.sources[0].trusted, false);
+assert.ok(state.project.scene3d.objects[0].kitNodeIds.length > 0, "legacy object paths migrate to kit-node ids");
+
+const playableProject = createEditorProject({
+  title: "Playable Fixture",
+  domainPath: "n:game:playable-fixture",
+  playable: {
+    schema: "nexusengine.playable-project/1",
+    id: "playable-fixture",
+    title: "Playable Fixture",
+    entry: "./index.html",
+    runtime: "nexusengine-webgl2",
+    contractHash: "fixture-contract"
+  }
+});
+assert.equal(playableProject.playable.entry, "./index.html");
+assert.equal(buildEditorExportManifest(playableProject).playable.contractHash, "fixture-contract");
+assert.throws(() => normalizePlayableProject({ schema: "nexusengine.playable-project/1", id: "escape", title: "Escape", entry: "../outside.html" }), /cannot escape/);
+assert.throws(() => normalizePlayableProject({ schema: "nexusengine.playable-project/1", id: "remote", title: "Remote", entry: "https://example.com/game" }), /relative or same-workspace/);
+
+const compositionProject = createEditorState().project;
+const composition = createCompositionController({
+  project: compositionProject,
+  NexusEngine,
+  registryImports: [createEditorRegistrySnapshot()],
+  globalObject: globalThis
+});
+assert.equal(composition.supported, true);
+assert.equal(composition.getValidation().ok, true);
+const acceptedBeforeInvalid = JSON.stringify(composition.getAccepted());
+composition.select("kit-node-domain-physics");
+assert.equal(composition.remove().ok, false, "referenced legacy kit cannot be removed");
+composition.update({ config: { substeps: "invalid" } });
+const invalidApply = composition.apply();
+assert.equal(invalidApply.ok, false, "invalid draft cannot replace accepted composition");
+assert.equal(JSON.stringify(composition.getAccepted()), acceptedBeforeInvalid, "failed Apply is atomic");
+composition.resetDraft();
+composition.select(compositionProject.composition.rootNodeId);
+const coreDataDomain = composition.listAddOptions("domain").find((entry) => entry.domainPath === "n:core-data");
+assert.ok(coreDataDomain);
+assert.equal(composition.add("domain", coreDataDomain.id).ok, true);
+const coreDataKit = composition.listAddOptions("kit").find((entry) => entry.id === "n-core-data-kit");
+assert.ok(coreDataKit);
+assert.equal(composition.add("kit", coreDataKit.id).ok, true);
+assert.equal(composition.apply().ok, true);
+const previewReceipt = await composition.runOnce(composition.getSelectedNode().id);
+assert.equal(previewReceipt.ok, true, previewReceipt.error);
+assert.equal(previewReceipt.disposed, true);
+assert.deepEqual(previewReceipt.installOrder, ["n-core-data-kit"]);
+assert.equal(composition.getReceipts().length, 1);
+assert.equal(buildEditorExportManifest(compositionProject).composition.schema, "nexusengine.composition-tree/1");
+
+const probeRegistry = NexusEngine.normalizeRegistrySnapshot({
+  ...NexusEngine.createCoreRegistrySnapshot(),
+  kits: [...NexusEngine.createCoreRegistrySnapshot().kits, {
+    id: "n-preview-probe-kit",
+    version: "0.0.4",
+    status: "stable-candidate",
+    kind: "domain-service-kit",
+    domain: "preview-probe",
+    domainPath: "n:core-data",
+    parentDomainPath: null,
+    apiName: "previewProbe",
+    apiVisibility: "public",
+    requires: [],
+    provides: ["n:preview-probe"],
+    defaults: {},
+    settingsSchema: { type: "object", additionalProperties: true },
+    preview: { command: "runEditorPreview", args: { amount: 2 }, timeoutMs: 100, editorSafe: true },
+    source: { registryId: "nexusengine-core", exportName: "createPreviewProbeKit", module: "test", trusted: true }
+  }]
+}, { allowTrustedSources: true });
+const ProbeNexusEngine = {
+  ...NexusEngine,
+  createCoreRegistrySnapshot: () => probeRegistry,
+  createPreviewProbeKit: () => NexusEngine.defineRuntimeKit({
+    id: "n-preview-probe-kit",
+    provides: ["n:preview-probe"],
+    install({ engine }) {
+      let count = 0;
+      engine.n ??= {};
+      engine.n.previewProbe = {
+        runEditorPreview({ amount }) { count += amount; return { count }; },
+        getSnapshot() { return { count }; }
+      };
+    }
+  })
+};
+const commandProject = createEditorState().project;
+const commandComposition = createCompositionController({ project: commandProject, NexusEngine: ProbeNexusEngine, registryImports: [createEditorRegistrySnapshot()], globalObject: globalThis });
+commandComposition.select(commandProject.composition.rootNodeId);
+assert.equal(commandComposition.add("domain", "domain-core-data").ok, true);
+assert.equal(commandComposition.add("kit", "n-preview-probe-kit").ok, true);
+assert.equal(commandComposition.apply().ok, true);
+const commandReceipt = await commandComposition.runOnce(commandComposition.getSelectedNode().id);
+assert.equal(commandReceipt.ok, true, commandReceipt.error);
+assert.equal(commandReceipt.disposed, true);
+assert.deepEqual(commandReceipt.previewActions, [{ kind: "command", registryId: "n-preview-probe-kit", apiName: "previewProbe", command: "runEditorPreview", result: { count: 2 } }]);
 assert.equal(buildDomainStackHealth(state.project).kitCount, 7);
 assert.equal(normalizeViewportRuntimeConfig(state.project).maxDrawnObjects, 700);
 assert.equal(normalizeViewportRuntimeConfig(state.project).culling, "distance-window");
@@ -402,16 +509,39 @@ assert.equal(sceneWindow.hiddenCount, 252);
 state.editorRuntime.getBinding("sceneObject").setQuery("cube-277");
 assert.equal(state.editorRuntime.getBinding("sceneObject").getWindow().objects[0].id, "cube-277");
 state.editorRuntime.getBinding("sceneObject").setQuery("");
+Object.assign(state.workspaceUi, {
+  activeContext: "inspector",
+  structureWidth: 312,
+  inspectorWidth: 388,
+  contextWidth: 344,
+  behaviorHeight: 286,
+  compactContextHeight: 318
+});
 const savedSnapshot = state.editorRuntime.getBinding("projectPersistence").saveLocal();
 assert.equal(savedSnapshot.project.scene3d.objects.length, 277);
 assert.equal(savedSnapshot.sequencePlayback.status, "complete");
 assert.ok(savedSnapshot.sequencePlayback.receipts.length >= state.project.sequenceSteps.length);
+assert.deepEqual(savedSnapshot.workspaceUi, {
+  timelineExpanded: false,
+  inspectorOpen: true,
+  projectActionsOpen: false,
+  activeContext: "inspector",
+  structureWidth: 312,
+  inspectorWidth: 388,
+  contextWidth: 344,
+  behaviorHeight: 286,
+  compactContextHeight: 318
+});
 state.project.scene3d.objects = state.project.scene3d.objects.slice(0, 1);
+Object.assign(state.workspaceUi, { activeContext: "structure", structureWidth: 220, inspectorWidth: 280 });
 assert.equal(state.project.scene3d.objects.length, 1);
 const loadedSnapshot = state.editorRuntime.getBinding("projectPersistence").loadLocal();
 assert.equal(loadedSnapshot.project.scene3d.objects.length, 277);
 assert.equal(state.project.scene3d.objects.length, 277);
 assert.equal(state.projectPersistence.status, "loaded");
+assert.equal(state.workspaceUi.activeContext, "inspector");
+assert.equal(state.workspaceUi.structureWidth, 312);
+assert.equal(state.workspaceUi.inspectorWidth, 388);
 const exportedProject = state.editorRuntime.getBinding("projectPersistence").exportFile();
 assert.equal(exportedProject.fileName, createEditorProjectFileName(exportedProject.snapshot));
 assert.match(exportedProject.fileName, /\.project\.json$/);
@@ -467,5 +597,50 @@ assert.match(buildDskGameHtml(presetManifest), /max draw 600/);
 assert.match(buildDskGameHtml(buildProfileManifest), /max draw 125/);
 assert.match(buildDskGameHtml(buildProfileManifest), /culling: manifest.runtime.culling/);
 assert.match(buildDskGameHtml(DEFAULT_DSK_GAME), /Default Cube/);
+
+const playableExportRoot = mkdtempSync(join(tmpdir(), "nexus-editor-playable-export-"));
+try {
+  const playableSource = join(playableExportRoot, "source");
+  const playableOutput = join(playableExportRoot, "output");
+  mkdirSync(join(playableSource, "assets"), { recursive: true });
+  mkdirSync(join(playableSource, ".agent"), { recursive: true });
+  writeFileSync(join(playableSource, "index.html"), "<!doctype html><title>Playable Fixture</title><canvas data-nexus-primary-3d></canvas>");
+  writeFileSync(join(playableSource, "assets", "runtime.mjs"), "export const ready = true;\n");
+  writeFileSync(join(playableSource, ".agent", "private-proof.json"), "{}\n");
+  writeFileSync(join(playableSource, "memory.md"), "authoring only\n");
+  const playableProjectPath = join(playableSource, "playable-fixture.project.json");
+  writeFileSync(playableProjectPath, `${JSON.stringify({ version: "0.3.0", savedAt: "2026-07-22T00:00:00.000Z", project: playableProject }, null, 2)}\n`);
+  const exportReport = JSON.parse(execFileSync(process.execPath, [
+    "scripts/nexus-engine-editor-cli.mjs",
+    "operations", "submit", "playable-export",
+    "--param", `input_project=${playableProjectPath}`,
+    "--param", `output_dir=${playableOutput}`,
+    "--json"
+  ], { cwd: process.cwd(), encoding: "utf8" }));
+  assert.equal(exportReport.outputs.playable.written, true);
+  assert.equal(exportReport.outputs.playable.entry, "index.html");
+  assert.equal(exportReport.outputs.playable.fileCount, 2);
+  assert.equal(existsSync(join(playableOutput, "index.html")), true);
+  assert.equal(readFileSync(join(playableOutput, "assets", "runtime.mjs"), "utf8"), "export const ready = true;\n");
+  assert.equal(existsSync(join(playableOutput, "playable-fixture.project.json")), false);
+  assert.equal(existsSync(join(playableOutput, ".agent")), false);
+  const cliStatus = JSON.parse(execFileSync(process.execPath, [
+    "scripts/nexus-engine-editor-cli.mjs", "status", "--project", playableProjectPath, "--json"
+  ], { cwd: process.cwd(), encoding: "utf8" }));
+  const mcpLines = execFileSync(process.execPath, ["scripts/nexus-engine-editor-screenshot-mcp.mjs"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "editor_project_status", arguments: { projectPath: playableProjectPath } } })}\n`
+  }).trim().split("\n");
+  const mcpResponse = JSON.parse(mcpLines.at(-1));
+  const mcpStatus = JSON.parse(mcpResponse.result.content[0].text);
+  assert.deepEqual(
+    { title: mcpStatus.title, domainPath: mcpStatus.domainPath, playable: mcpStatus.playable, objectCount: mcpStatus.objectCount, kitCount: mcpStatus.kitCount, sequenceGraph: mcpStatus.sequenceGraph },
+    { title: cliStatus.title, domainPath: cliStatus.domainPath, playable: cliStatus.playable, objectCount: cliStatus.objectCount, kitCount: cliStatus.kitCount, sequenceGraph: cliStatus.sequenceGraph },
+    "MCP and CLI expose the same accepted project state"
+  );
+} finally {
+  rmSync(playableExportRoot, { recursive: true, force: true });
+}
 
 console.log("editor intent smoke passed");

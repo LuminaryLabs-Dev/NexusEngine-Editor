@@ -1,19 +1,47 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { mkdir } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, stat, mkdir } from "node:fs/promises";
+import { createServer } from "node:http";
+import { extname, relative, resolve, sep } from "node:path";
 import readline from "node:readline";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { chromium } from "playwright";
 
 const DEFAULT_URL = "http://127.0.0.1:4174/?run=small-game-loop-2";
 const DEFAULT_SCREENSHOT_DIR = ".agent/screenshots";
 const DEFAULT_MCP_OUTPUT_DIR = ".agent/mcp-output";
+const EDITOR_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
 const execFileAsync = promisify(execFile);
 const CLI_SCREENSHOT_OPERATIONS = new Set(["chess-game", "target-clicker-game", "gem-collector-game", "game-template"]);
 
 const TOOLS = Object.freeze([
+  {
+    name: "editor_project_status",
+    description: "Load a project through the authoritative Editor CLI and return its accepted normalized state.",
+    inputSchema: {
+      type: "object",
+      required: ["projectPath"],
+      properties: {
+        projectPath: { type: "string", description: "Source .project.json path." }
+      }
+    }
+  },
+  {
+    name: "editor_playable_export",
+    description: "Export the exact playable project through the Editor CLI, launch the standalone folder, and capture title-state proof.",
+    inputSchema: {
+      type: "object",
+      required: ["projectPath", "outputDirectory"],
+      properties: {
+        projectPath: { type: "string", description: "Source .project.json path." },
+        outputDirectory: { type: "string", description: "New or empty destination directory." },
+        outputPath: { type: "string", description: "Screenshot path. Defaults under .agent/screenshots." },
+        width: { type: "number", description: "Viewport width." },
+        height: { type: "number", description: "Viewport height." }
+      }
+    }
+  },
   {
     name: "editor_screenshot",
     description: "Capture a screenshot of the NexusEngine Editor or exported game URL.",
@@ -121,6 +149,93 @@ function screenshotPath(input = {}) {
 
 function mcpOutputPath(inputPath, fallbackName) {
   return resolve(inputPath || `${DEFAULT_MCP_OUTPUT_DIR}/${fallbackName}`);
+}
+
+async function runEditorCli(args) {
+  const { stdout, stderr } = await execFileAsync(process.execPath, ["scripts/nexus-engine-editor-cli.mjs", ...args], {
+    cwd: EDITOR_ROOT,
+    maxBuffer: 20 * 1024 * 1024
+  });
+  return { report: JSON.parse(stdout), stderr: stderr.trim() };
+}
+
+async function editorProjectStatus(input = {}) {
+  if (!input.projectPath) throw new Error("editor_project_status requires projectPath.");
+  const { report, stderr } = await runEditorCli(["status", "--project", resolve(input.projectPath), "--json"]);
+  return { ...report, stderr };
+}
+
+const STATIC_MIME = Object.freeze({
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".svg": "image/svg+xml"
+});
+
+async function withStaticServer(root, callback) {
+  const canonicalRoot = resolve(root);
+  const server = createServer(async (request, response) => {
+    try {
+      const pathname = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname).replace(/^\/+/, "");
+      const filePath = resolve(canonicalRoot, pathname || "index.html");
+      const localPath = relative(canonicalRoot, filePath);
+      if (localPath === ".." || localPath.startsWith(`..${sep}`)) throw new Error("path escapes export root");
+      const fileStats = await stat(filePath);
+      if (!fileStats.isFile()) throw new Error("not a file");
+      response.writeHead(200, { "content-type": STATIC_MIME[extname(filePath).toLowerCase()] ?? "application/octet-stream", "cache-control": "no-store" });
+      response.end(await readFile(filePath));
+    } catch {
+      response.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      response.end("Not found");
+    }
+  });
+  await new Promise((resolveReady, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolveReady);
+  });
+  try {
+    const address = server.address();
+    return await callback(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise((resolveClosed) => server.close(resolveClosed));
+  }
+}
+
+async function editorPlayableExport(input = {}) {
+  if (!input.projectPath || !input.outputDirectory) throw new Error("editor_playable_export requires projectPath and outputDirectory.");
+  const { report, stderr } = await runEditorCli([
+    "operations", "submit", "playable-export",
+    "--param", `input_project=${resolve(input.projectPath)}`,
+    "--param", `output_dir=${resolve(input.outputDirectory)}`,
+    "--json"
+  ]);
+  const receipt = report.outputs?.playable;
+  if (!receipt?.written) throw new Error("Editor CLI did not produce a playable export receipt.");
+  const outputPath = screenshotPath(input);
+  await mkdir(resolve(outputPath, ".."), { recursive: true });
+  const proof = await withStaticServer(receipt.path, async (baseUrl) => withPage({ ...input, url: `${baseUrl}/${receipt.entry}` }, async (page) => {
+    await page.waitForFunction(() => Boolean(window.__NEXUS_GAME_PROOF__), null, { timeout: 15000 });
+    await page.screenshot({ path: outputPath, fullPage: false });
+    return page.evaluate(() => ({
+      title: document.title,
+      lifecycle: window.__NEXUS_GAME_PROOF__?.snapshot?.().lifecycle ?? null,
+      proofVersion: window.__NEXUS_GAME_PROOF__?.version ?? null,
+      hasPrimary3d: Boolean(document.querySelector("[data-nexus-primary-3d]")),
+      bodyText: document.body.innerText.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 24)
+    }));
+  }));
+  return {
+    ok: report.ok && proof.lifecycle === "title" && proof.hasPrimary3d,
+    cli: report,
+    receipt,
+    proof: { ...proof, screenshotPath: outputPath },
+    stderr
+  };
 }
 
 async function withPage(input, callback) {
@@ -348,6 +463,14 @@ async function cliGameScreenshot(input = {}) {
 }
 
 async function callTool(name, input = {}) {
+  if (name === "editor_project_status") {
+    const result = await editorProjectStatus(input);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+  if (name === "editor_playable_export") {
+    const result = await editorPlayableExport(input);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
   if (name === "editor_screenshot") {
     const result = await captureScreenshot(input);
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };

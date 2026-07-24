@@ -59,6 +59,18 @@ function dot(a, b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 }
 
+function cameraVector(value, fallback) {
+  const source = Array.isArray(value) ? value : [value?.x, value?.y, value?.z];
+  const vector = source.map(Number);
+  return vector.length === 3 && vector.every(Number.isFinite) ? vector : [...fallback];
+}
+
+function writeCameraVector(target, value) {
+  target.x = Number(value[0].toFixed(4));
+  target.y = Number(value[1].toFixed(4));
+  target.z = Number(value[2].toFixed(4));
+}
+
 function perspective(fovy, aspect, near, far) {
   const f = 1 / Math.tan(fovy / 2);
   const nf = 1 / (near - far);
@@ -269,6 +281,89 @@ export function createViewportRenderer(canvas, project, options = {}) {
   }));
   let disposed = false;
   let frame = 0;
+  const projectCamera = project.scene3d.camera ??= {};
+  projectCamera.position ??= { x: 4.8, y: 3.2, z: 6.2 };
+  projectCamera.target ??= { x: 0, y: 0.85, z: 0 };
+  let cameraPosition = cameraVector(projectCamera.position, [4.8, 3.2, 6.2]);
+  let cameraTarget = cameraVector(projectCamera.target, [0, 0.85, 0]);
+  let drag = null;
+
+  function commitCamera() {
+    writeCameraVector(projectCamera.position, cameraPosition);
+    writeCameraVector(projectCamera.target, cameraTarget);
+    options.onCameraChange?.({ position: { ...projectCamera.position }, target: { ...projectCamera.target } });
+  }
+
+  function orbit(deltaX, deltaY) {
+    const offset = subtract(cameraPosition, cameraTarget);
+    const distance = Math.max(0.35, Math.hypot(...offset));
+    let yaw = Math.atan2(offset[0], offset[2]);
+    let pitch = Math.asin(Math.max(-0.98, Math.min(0.98, offset[1] / distance)));
+    yaw -= deltaX * 0.008;
+    pitch = Math.max(-1.42, Math.min(1.42, pitch + deltaY * 0.006));
+    const horizontal = Math.cos(pitch) * distance;
+    cameraPosition = [
+      cameraTarget[0] + Math.sin(yaw) * horizontal,
+      cameraTarget[1] + Math.sin(pitch) * distance,
+      cameraTarget[2] + Math.cos(yaw) * horizontal
+    ];
+    commitCamera();
+  }
+
+  function pan(deltaX, deltaY) {
+    const forward = normalize(subtract(cameraTarget, cameraPosition));
+    const right = normalize(cross(forward, [0, 1, 0]));
+    const up = normalize(cross(right, forward));
+    const distance = Math.max(1, Math.hypot(...subtract(cameraPosition, cameraTarget)));
+    const scale = distance * 0.0016;
+    const move = right.map((value, index) => value * -deltaX * scale + up[index] * deltaY * scale);
+    cameraPosition = cameraPosition.map((value, index) => value + move[index]);
+    cameraTarget = cameraTarget.map((value, index) => value + move[index]);
+    commitCamera();
+  }
+
+  function zoom(delta) {
+    const offset = subtract(cameraPosition, cameraTarget);
+    const distance = Math.max(0.5, Math.hypot(...offset));
+    const next = Math.max(0.5, Math.min(500, distance * Math.exp(delta * 0.001)));
+    const direction = normalize(offset);
+    cameraPosition = cameraTarget.map((value, index) => value + direction[index] * next);
+    commitCamera();
+  }
+
+  function onPointerDown(event) {
+    if (![0, 1, 2].includes(event.button)) return;
+    drag = { x: event.clientX, y: event.clientY, pan: event.button !== 0 || event.shiftKey };
+    canvas.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function onPointerMove(event) {
+    if (!drag) return;
+    const deltaX = event.clientX - drag.x;
+    const deltaY = event.clientY - drag.y;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    if (drag.pan || event.shiftKey) pan(deltaX, deltaY);
+    else orbit(deltaX, deltaY);
+  }
+
+  function onPointerUp(event) {
+    drag = null;
+    canvas.releasePointerCapture?.(event.pointerId);
+  }
+
+  function onWheel(event) {
+    zoom(event.deltaY);
+    event.preventDefault();
+  }
+
+  canvas.addEventListener("pointerdown", onPointerDown);
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerup", onPointerUp);
+  canvas.addEventListener("pointercancel", onPointerUp);
+  canvas.addEventListener("wheel", onWheel, { passive: false });
+  canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
   function resize() {
     const scale = Math.min(window.devicePixelRatio || 1, 2);
@@ -285,8 +380,9 @@ export function createViewportRenderer(canvas, project, options = {}) {
     if (disposed) return;
     resize();
     const aspect = canvas.width / canvas.height;
-    const projection = perspective(Math.PI / 4, aspect, 0.1, 100);
-    const view = lookAt([4.8, 3.2, 6.2], [0, 0.85, 0], [0, 1, 0]);
+    const fov = Math.max(20, Math.min(110, Number(projectCamera.fov) || 45)) * Math.PI / 180;
+    const projection = perspective(fov, aspect, 0.05, 1000);
+    const view = lookAt(cameraPosition, cameraTarget, [0, 1, 0]);
     const viewProjection = multiply(projection, view);
     const mode = options.getMode?.() ?? "stopped";
     const spin = mode === "playing" ? now * 0.00045 : 0;
@@ -317,11 +413,23 @@ export function createViewportRenderer(canvas, project, options = {}) {
   return {
     type: "webgl",
     getStats() {
-      return { ...renderStats };
+      return { ...renderStats, camera: this.getCamera() };
+    },
+    getCamera() {
+      return {
+        position: { x: cameraPosition[0], y: cameraPosition[1], z: cameraPosition[2] },
+        target: { x: cameraTarget[0], y: cameraTarget[1], z: cameraTarget[2] },
+        fov: Math.max(20, Math.min(110, Number(projectCamera.fov) || 45))
+      };
     },
     dispose() {
       disposed = true;
       window.cancelAnimationFrame(frame);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerup", onPointerUp);
+      canvas.removeEventListener("pointercancel", onPointerUp);
+      canvas.removeEventListener("wheel", onWheel);
       gl.deleteBuffer(grid.buffer);
       gl.deleteBuffer(axes.buffer);
       for (const mesh of objectMeshes) {

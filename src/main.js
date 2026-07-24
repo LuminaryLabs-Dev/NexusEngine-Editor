@@ -8,12 +8,21 @@ import {
   selectSceneObject
 } from "./editor-domain-model.js";
 import { createNexusEngineEditorRuntime, loadNexusEngineModule } from "./nexus-engine-editor-runtime.js";
+import { createCompositionController } from "./editor-composition.js";
+import { createEditorRegistrySnapshot } from "./editor-kit-registry.js";
 import { createViewportRenderer } from "./viewport-webgl.js";
 
 const state = createEditorState();
 const root = document.querySelector("#app");
 let viewportRenderer = null;
-const DOCKED_PANELS = Object.freeze(new Set(["domainStack", "configure", "sequence"]));
+const WORKSPACE_CONTEXTS = Object.freeze(new Set(["structure", "inspector", "behavior"]));
+const WORKSPACE_SIZE_LIMITS = Object.freeze({
+  structure: Object.freeze({ key: "structureWidth", min: 220, max: 360 }),
+  inspector: Object.freeze({ key: "inspectorWidth", min: 280, max: 440 }),
+  context: Object.freeze({ key: "contextWidth", min: 280, max: 420 }),
+  behavior: Object.freeze({ key: "behaviorHeight", min: 180, max: 420 }),
+  compact: Object.freeze({ key: "compactContextHeight", min: 220, max: 420 })
+});
 const VIEWPORT_TOOL_BUTTONS = Object.freeze([
   { id: "select", label: "↖", title: "Select" },
   { id: "move", label: "✣", title: "Move" },
@@ -21,7 +30,24 @@ const VIEWPORT_TOOL_BUTTONS = Object.freeze([
   { id: "scale", label: "□", title: "Scale" },
   { id: "pan", label: "✋", title: "Pan" }
 ]);
-const nexusEngineLoad = await loadNexusEngineModule({ allowRemote: true });
+function localWorkspaceResourceUrl(parameter) {
+  const requested = new URLSearchParams(globalThis.location?.search ?? "").get(parameter);
+  if (!requested || !["127.0.0.1", "localhost"].includes(globalThis.location?.hostname)) return null;
+  try {
+    const url = new URL(requested, globalThis.location.href);
+    return url.origin === globalThis.location.origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+const localEngineUrl = localWorkspaceResourceUrl("engine");
+let projectSourceUrl = localWorkspaceResourceUrl("project");
+const nexusEngineLoad = await loadNexusEngineModule({
+  allowRemote: true,
+  url: localEngineUrl ?? undefined,
+  timeoutMs: localEngineUrl ? 30000 : 2500
+});
 state.editorRuntime = createNexusEngineEditorRuntime({
   NexusEngine: nexusEngineLoad.module,
   source: nexusEngineLoad.source,
@@ -29,6 +55,29 @@ state.editorRuntime = createNexusEngineEditorRuntime({
   root,
   recordEvent: (type, payload) => recordEditorEvent(state, type, payload)
 });
+if (projectSourceUrl) {
+  try {
+    const response = await fetch(projectSourceUrl, { cache: "no-store" });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    state.editorRuntime.getBinding("projectPersistence").importFile(await response.text(), new URL(projectSourceUrl).pathname);
+  } catch (error) {
+    projectSourceUrl = null;
+    state.compositionUi.message = `Project could not be opened: ${error.message}`;
+  }
+}
+function rebuildCompositionController(selectedNodeId = null) {
+  state.compositionController?.stop?.();
+  state.compositionController = createCompositionController({
+    project: state.project,
+    NexusEngine: nexusEngineLoad.module,
+    registryImports: [createEditorRegistrySnapshot()],
+    globalObject: globalThis
+  });
+  if (selectedNodeId) state.compositionController.select(selectedNodeId);
+  return state.compositionController;
+}
+rebuildCompositionController();
+state.configureSubject = "composition";
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -40,21 +89,47 @@ function escapeHtml(value) {
 }
 
 function setMode(mode) {
+  if (mode === "stopped") state.compositionController?.stop?.();
+  if (mode === "stopped") state.playableRuntime = null;
   state.mode = mode;
   recordEditorEvent(state, `editor.${mode}`, { domainPath: "n:editor:status", mode });
   render();
 }
 
 function playEditor() {
-  state.editorRuntime.getBinding("sequenceTimeline").runAll();
-  state.mode = "playing";
-  recordEditorEvent(state, "editor.playing", { domainPath: "n:editor:status", mode: "playing" });
+  state.workspaceUi.projectActionsOpen = false;
+  if (state.project.playable) {
+    const entry = resolvePlayableEntry();
+    if (!entry) {
+      state.mode = "stopped";
+      state.compositionUi.message = "Playable game unavailable: open this project from its served workspace path.";
+      recordEditorEvent(state, "editor.play.blocked", { domainPath: "n:editor:composition", severity: "warning", message: state.compositionUi.message });
+      render();
+      return;
+    }
+    state.compositionController?.stop?.();
+    state.playableRuntime = { id: state.project.playable.id, entry, status: "loading" };
+    state.mode = "playing";
+    recordEditorEvent(state, "editor.playable.started", { domainPath: state.project.domainPath, playableId: state.project.playable.id, entry });
+    render();
+    return;
+  }
+  const result = state.compositionController?.play?.(state.compositionController?.getSelectedNode?.()?.id ?? state.project.composition?.rootNodeId);
+  if (result?.ok) {
+    state.mode = "playing";
+    recordEditorEvent(state, "editor.playing", { domainPath: "n:editor:status", mode: "playing", installOrder: result.installOrder });
+  } else {
+    state.mode = "stopped";
+    state.compositionUi.message = result?.error ?? "Play unavailable.";
+    recordEditorEvent(state, "editor.play.blocked", { domainPath: "n:editor:composition", severity: "warning", message: state.compositionUi.message });
+  }
   render();
 }
 
 function selectDomain(domainPath) {
   state.selectedDomainPath = domainPath;
   state.configureSubject = domainPath === "n:scene" ? "object" : "domain";
+  state.workspaceUi.activeContext = "inspector";
   if (domainPath === "n:scene") {
     const selected = selectSceneObject(state.project, state.selectedObjectId);
     state.selectedObjectId = selected?.id ?? "";
@@ -67,6 +142,7 @@ function selectObject(objectId) {
   const object = state.editorRuntime.getBinding("sceneObject").select(objectId);
   if (!object) return;
   state.configureSubject = "object";
+  state.workspaceUi.activeContext = "inspector";
   render();
 }
 
@@ -75,11 +151,19 @@ function selectStep(stepId) {
   const step = state.project.sequenceSteps.find((item) => item.id === stepId);
   if (step) state.selectedDomainPath = step.domainPath;
   state.configureSubject = "sequence-step";
+  state.workspaceUi.activeContext = "inspector";
   recordEditorEvent(state, "editor.sequence.selected", { domainPath: step?.domainPath ?? "n:editor:sequence", stepId });
   render();
 }
 
 function buildHtml() {
+  state.workspaceUi.projectActionsOpen = false;
+  const report = state.compositionController?.getValidation?.();
+  if (state.compositionController?.isDirty?.() || report?.ok === false) {
+    state.compositionUi.message = state.compositionController?.isDirty?.() ? "Apply the composition draft before Build." : report?.errors?.[0]?.message ?? "Composition is invalid.";
+    render();
+    return;
+  }
   state.editorRuntime.getBinding("htmlBuild").build();
   render();
 }
@@ -97,20 +181,28 @@ function downloadHtml() {
     domainPath: "n:build:web",
     fileName: state.build.fileName
   });
+  state.workspaceUi.projectActionsOpen = false;
+  render();
 }
 
 function saveProject() {
+  state.workspaceUi.projectActionsOpen = false;
   state.editorRuntime.getBinding("projectPersistence").saveLocal();
   render();
 }
 
 function loadProject() {
+  state.workspaceUi.projectActionsOpen = false;
   state.editorRuntime.getBinding("projectPersistence").loadLocal();
+  rebuildCompositionController();
   render();
 }
 
 function resetProject() {
+  state.workspaceUi.projectActionsOpen = false;
+  projectSourceUrl = null;
   state.editorRuntime.getBinding("projectPersistence").resetProject();
+  rebuildCompositionController();
   render();
 }
 
@@ -129,7 +221,114 @@ function exportProjectFile() {
 async function importProjectFile(file) {
   if (!file) return;
   const serialized = await file.text();
+  projectSourceUrl = null;
   state.editorRuntime.getBinding("projectPersistence").importFile(serialized, file.name);
+  rebuildCompositionController();
+  render();
+}
+
+function resolvePlayableEntry() {
+  const entry = state.project.playable?.entry;
+  if (!entry) return null;
+  try {
+    const url = new URL(entry, projectSourceUrl ?? globalThis.location.href);
+    if (url.origin !== globalThis.location.origin) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
+
+function selectCompositionNode(nodeId) {
+  const node = state.compositionController?.select?.(nodeId);
+  if (!node) return;
+  const record = state.compositionController.getRecord?.(node);
+  state.configureSubject = "composition";
+  state.workspaceUi.activeContext = "inspector";
+  if (record?.domainPath) state.selectedDomainPath = record.domainPath;
+  state.compositionUi.message = "";
+  recordEditorEvent(state, "editor.composition.selected", { domainPath: record?.domainPath ?? "n:editor:composition", nodeId });
+  render();
+}
+
+function toggleCompositionAdd() {
+  state.compositionUi.addOpen = !state.compositionUi.addOpen;
+  state.workspaceUi.activeContext = "structure";
+  state.compositionUi.message = "";
+  render();
+}
+
+function addCompositionReference() {
+  const result = state.compositionController?.add?.(state.compositionUi.addKind, state.compositionUi.selectedRegistryId);
+  state.compositionUi.message = result?.ok ? `${state.compositionUi.addKind} added to the draft.` : result?.reason ?? "Unable to add registry reference.";
+  if (result?.ok) {
+    state.compositionUi.addOpen = false;
+    state.configureSubject = "composition";
+    state.workspaceUi.activeContext = "inspector";
+  }
+  render();
+}
+
+function applyCompositionDraft() {
+  const result = state.compositionController?.apply?.();
+  state.compositionUi.message = result?.ok ? "Accepted composition replaced atomically." : result?.report?.errors?.[0]?.message ?? "Apply failed; accepted composition is unchanged.";
+  if (!result?.ok) state.workspaceUi.activeContext = "inspector";
+  recordEditorEvent(state, result?.ok ? "editor.composition.applied" : "editor.composition.apply.failed", {
+    domainPath: "n:editor:composition",
+    severity: result?.ok ? "info" : "warning",
+    revision: result?.composition?.revision,
+    errors: result?.report?.errors ?? []
+  });
+  render();
+}
+
+async function runCompositionOnce() {
+  state.compositionUi.message = "Running disposable preview…";
+  render();
+  const receipt = await state.compositionController?.runOnce?.();
+  state.compositionUi.message = receipt?.ok ? `Preview passed in ${Math.round(receipt.durationMs ?? 0)}ms and was disposed.` : receipt?.error ?? "Preview failed.";
+  state.workspaceUi.activeContext = "inspector";
+  recordEditorEvent(state, receipt?.ok ? "editor.composition.preview.passed" : "editor.composition.preview.failed", {
+    domainPath: "n:editor:composition",
+    severity: receipt?.ok ? "info" : "warning",
+    receipt
+  });
+  render();
+}
+
+function removeCompositionNode() {
+  const result = state.compositionController?.remove?.();
+  state.compositionUi.message = result?.ok ? "Reference removed from the draft." : result?.reason ?? "Unable to remove reference.";
+  render();
+}
+
+function updateCompositionConfig(serialized) {
+  try {
+    const config = JSON.parse(serialized);
+    if (!config || typeof config !== "object" || Array.isArray(config)) throw new TypeError("Kit config must be a JSON object.");
+    state.compositionController.update({ config });
+    state.compositionUi.message = "Draft settings updated; Apply is required.";
+  } catch (error) {
+    state.compositionUi.message = `Settings not changed: ${error.message}`;
+  }
+  render();
+}
+
+function updateCompositionConfigField(key, type, serialized) {
+  try {
+    let value;
+    if (type === "boolean") value = serialized === "true";
+    else if (type === "number" || type === "integer") {
+      if (serialized === "") throw new TypeError(`${key} requires a number.`);
+      value = Number(serialized);
+      if (!Number.isFinite(value)) throw new TypeError(`${key} requires a finite number.`);
+    } else if (type === "enum" || type === "json") value = JSON.parse(serialized);
+    else value = serialized;
+    state.compositionController.update({ config: { [key]: value } });
+    state.compositionUi.message = `Draft ${key} setting updated; Apply is required.`;
+  } catch (error) {
+    state.compositionUi.message = `Setting not changed: ${error.message}`;
+  }
   render();
 }
 
@@ -246,6 +445,94 @@ function addStep() {
   render();
 }
 
+function toggleTimeline() {
+  state.workspaceUi.timelineExpanded = !state.workspaceUi.timelineExpanded;
+  if (state.workspaceUi.timelineExpanded) state.workspaceUi.activeContext = "behavior";
+  render();
+}
+
+function setWorkspaceContext(context) {
+  if (!WORKSPACE_CONTEXTS.has(context)) return;
+  state.workspaceUi.activeContext = context;
+  if (context === "behavior") state.workspaceUi.timelineExpanded = true;
+  render();
+}
+
+function toggleProjectActions() {
+  state.workspaceUi.projectActionsOpen = !state.workspaceUi.projectActionsOpen;
+  render();
+}
+
+function resetWorkspaceLayout() {
+  Object.assign(state.workspaceUi, {
+    structureWidth: 270,
+    inspectorWidth: 320,
+    contextWidth: 320,
+    behaviorHeight: 260,
+    compactContextHeight: 300
+  });
+  state.workspaceUi.projectActionsOpen = false;
+  recordEditorEvent(state, "editor.workspace.reset", { domainPath: "n:editor:dock" });
+  render();
+}
+
+function setWorkspaceSize(kind, value, workspace = root.querySelector(".editor-workspace")) {
+  const limits = WORKSPACE_SIZE_LIMITS[kind];
+  if (!limits) return;
+  const size = Math.max(limits.min, Math.min(limits.max, Math.round(Number(value) || limits.min)));
+  state.workspaceUi[limits.key] = size;
+  const variable = {
+    structure: "--structure-size",
+    inspector: "--inspector-size",
+    context: "--context-size",
+    behavior: "--behavior-size",
+    compact: "--compact-context-size"
+  }[kind];
+  workspace?.style.setProperty(variable, `${size}px`);
+  const separator = root.querySelector(`[data-workspace-resize="${kind}"]`);
+  separator?.setAttribute("aria-valuenow", String(size));
+}
+
+function bindWorkspaceResizers() {
+  for (const separator of root.querySelectorAll("[data-workspace-resize]")) {
+    const kind = separator.dataset.workspaceResize;
+    const limits = WORKSPACE_SIZE_LIMITS[kind];
+    if (!limits) continue;
+    const isVerticalSize = kind === "behavior" || kind === "compact";
+    const pointerSign = kind === "inspector" || kind === "context" || isVerticalSize ? -1 : 1;
+    separator.addEventListener("pointerdown", (event) => {
+      const start = isVerticalSize ? event.clientY : event.clientX;
+      const initial = state.workspaceUi[limits.key];
+      separator.setPointerCapture(event.pointerId);
+      separator.classList.add("resizing");
+      const move = (moveEvent) => {
+        const current = isVerticalSize ? moveEvent.clientY : moveEvent.clientX;
+        setWorkspaceSize(kind, initial + ((current - start) * pointerSign));
+      };
+      const stop = () => {
+        separator.classList.remove("resizing");
+        separator.removeEventListener("pointermove", move);
+        separator.removeEventListener("pointerup", stop);
+        separator.removeEventListener("pointercancel", stop);
+        recordEditorEvent(state, "editor.workspace.resized", {
+          domainPath: "n:editor:dock",
+          region: kind,
+          size: state.workspaceUi[limits.key]
+        });
+      };
+      separator.addEventListener("pointermove", move);
+      separator.addEventListener("pointerup", stop);
+      separator.addEventListener("pointercancel", stop);
+    });
+    separator.addEventListener("keydown", (event) => {
+      const delta = event.key === "ArrowRight" || event.key === "ArrowDown" ? 16 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -16 : 0;
+      if (!delta) return;
+      event.preventDefault();
+      setWorkspaceSize(kind, state.workspaceUi[limits.key] + (delta * pointerSign));
+    });
+  }
+}
+
 function linkEvent() {
   state.editorRuntime.getBinding("sequenceTimeline").linkEvent(readSequenceLinkPatch());
   render();
@@ -352,11 +639,153 @@ function assignSelectedKitToVisibleObjects() {
   render();
 }
 
-function panelStyle(panelName) {
-  if (DOCKED_PANELS.has(panelName)) return "";
-  const position = state.panelPositions[panelName];
-  if (!position) return "";
-  return `style="left:${position.x}px;top:${position.y}px;right:auto;bottom:auto;transform:none;"`;
+function compositionRecord(node) {
+  if (!node || !state.compositionController?.registry) return null;
+  const list = node.kind === "domain" ? state.compositionController.registry.domains : state.compositionController.registry.kits;
+  return list.find((record) => record.id === node.registryId) ?? null;
+}
+
+function compositionNodeLabel(node) {
+  const record = compositionRecord(node);
+  if (node.id === state.project.composition?.rootNodeId) return node.labelOverride ?? state.project.title ?? "Game Root";
+  return node.labelOverride ?? record?.label ?? record?.metadata?.label ?? record?.id ?? node.registryId;
+}
+
+function renderCompositionTree() {
+  const controller = state.compositionController;
+  if (!controller?.supported) return `<div class="composer-unavailable"><strong>Composition unavailable</strong><span>${escapeHtml(controller?.reason ?? "No compatible Engine module.")}</span></div>`;
+  const tree = controller.getDraft();
+  const selectedId = controller.getSelectedNode()?.id;
+  const byParent = new Map();
+  for (const node of tree.nodes) byParent.set(node.parentNodeId, [...(byParent.get(node.parentNodeId) ?? []), node]);
+  for (const nodes of byParent.values()) nodes.sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
+  const renderNode = (node, depth = 0) => {
+    const record = compositionRecord(node);
+    const children = byParent.get(node.id) ?? [];
+    return `
+      <div class="composition-branch">
+        <button type="button" class="composition-node ${selectedId === node.id ? "selected" : ""} ${node.enabled ? "" : "disabled-node"}" data-composition-node="${escapeHtml(node.id)}" style="--tree-depth:${depth}">
+          <span class="composition-disclosure">${children.length ? "▾" : "·"}</span>
+          <span class="composition-kind">${node.kind === "domain" ? "◈" : "◇"}</span>
+          <span class="composition-node-copy"><strong>${escapeHtml(compositionNodeLabel(node))}</strong><small><span class="composition-type-label">${node.kind === "domain" ? "Domain" : "Kit"}</span>${escapeHtml(record?.domainPath ?? node.registryId)}</small></span>
+          <span class="composition-state">${node.enabled ? "●" : "○"}</span>
+        </button>
+        ${children.map((child) => renderNode(child, depth + 1)).join("")}
+      </div>`;
+  };
+  const rootNode = tree.nodes.find((node) => node.id === tree.rootNodeId);
+  return rootNode ? renderNode(rootNode) : `<div class="composer-unavailable">Missing composition root.</div>`;
+}
+
+function renderCompositionAdd() {
+  if (!state.compositionUi.addOpen || !state.compositionController?.supported) return "";
+  const kind = state.compositionUi.addKind;
+  const query = state.compositionUi.addQuery.trim().toLowerCase();
+  const options = state.compositionController.listAddOptions(kind).filter((entry) => !query || `${entry.label} ${entry.id} ${entry.domainPath}`.toLowerCase().includes(query));
+  const selectedId = options.some((entry) => entry.id === state.compositionUi.selectedRegistryId) ? state.compositionUi.selectedRegistryId : options[0]?.id ?? "";
+  state.compositionUi.selectedRegistryId = selectedId;
+  return `
+    <section class="composition-add-region" aria-label="Add to game structure">
+      <div class="composition-add-kind" role="group" aria-label="Add type">
+        <button type="button" data-add-kind="domain" class="${kind === "domain" ? "active" : ""}">Game Domain</button>
+        <button type="button" data-add-kind="kit" class="${kind === "kit" ? "active" : ""}">Behavior Kit</button>
+      </div>
+      <input id="composition-add-search" type="search" value="${escapeHtml(state.compositionUi.addQuery)}" placeholder="Search valid ${kind}s">
+      <select id="composition-add-select" ${options.length ? "" : "disabled"}>
+        ${options.map((entry) => `<option value="${escapeHtml(entry.id)}" ${entry.id === selectedId ? "selected" : ""}>${escapeHtml(entry.label)} — ${escapeHtml(entry.domainPath)}</option>`).join("") || `<option>No valid ${kind}s here</option>`}
+      </select>
+      <button id="composition-add-confirm" type="button" class="wide-action" ${selectedId ? "" : "disabled"}>Add ${kind === "domain" ? "Game Domain" : "Behavior Kit"}</button>
+    </section>`;
+}
+
+function renderCompositionPanel() {
+  const controller = state.compositionController;
+  const report = controller?.getValidation?.() ?? { ok: false, errors: [] };
+  const dirty = controller?.isDirty?.() === true;
+  const actionMessage = !controller?.supported
+    ? "Connect a NexusEngine build with Composition Tree support."
+    : dirty
+      ? "Draft changes must be applied before preview or play."
+      : !report.ok
+        ? "Resolve the listed composition issues before preview or play."
+        : "Select an area or behavior to inspect and edit it.";
+  return `
+    <div class="panel-title"><span class="dock-anchor">⌜</span><h2>Game Structure</h2><span class="composition-badge ${report.ok ? "ok" : "error"}">${dirty ? "Draft" : report.ok ? "Applied" : "Invalid"}</span></div>
+    ${renderCompositionAdd()}
+    <div class="composition-summary ${report.ok ? "ok" : "error"}">
+      <strong>${report.ok ? "Tree valid" : `${report.errors?.length ?? 0} blocking issue${report.errors?.length === 1 ? "" : "s"}`}</strong>
+      <span>${escapeHtml(actionMessage)}</span>
+    </div>
+    <div class="composition-tree" role="tree">${renderCompositionTree()}</div>
+    ${state.compositionUi.message ? `<div class="composition-message" aria-live="polite">${escapeHtml(state.compositionUi.message)}</div>` : ""}
+  `;
+}
+
+function renderCompositionSchemaField(key, schema = {}, value) {
+  const label = schema.title ?? key;
+  const type = Array.isArray(schema.type) ? schema.type.find((entry) => entry !== "null") : schema.type;
+  if (Array.isArray(schema.enum)) {
+    return `<label class="composition-schema-field"><span>${escapeHtml(label)}</span><select data-composition-config-field="${escapeHtml(key)}" data-config-type="enum">${schema.enum.map((entry) => `<option value="${escapeHtml(JSON.stringify(entry))}" ${JSON.stringify(entry) === JSON.stringify(value) ? "selected" : ""}>${escapeHtml(String(entry))}</option>`).join("")}</select></label>`;
+  }
+  if (type === "boolean") {
+    return `<label class="composition-schema-field"><span>${escapeHtml(label)}</span><select data-composition-config-field="${escapeHtml(key)}" data-config-type="boolean"><option value="true" ${value === true ? "selected" : ""}>On</option><option value="false" ${value === false ? "selected" : ""}>Off</option></select></label>`;
+  }
+  if (type === "number" || type === "integer") {
+    return `<label class="composition-schema-field"><span>${escapeHtml(label)}</span><input data-composition-config-field="${escapeHtml(key)}" data-config-type="${type}" type="number" value="${escapeHtml(value ?? "")}" ${schema.minimum == null ? "" : `min="${escapeHtml(schema.minimum)}"`} ${schema.maximum == null ? "" : `max="${escapeHtml(schema.maximum)}"`} step="${type === "integer" ? "1" : "any"}"></label>`;
+  }
+  if (type === "string") {
+    return `<label class="composition-schema-field"><span>${escapeHtml(label)}</span><input data-composition-config-field="${escapeHtml(key)}" data-config-type="string" type="text" value="${escapeHtml(value ?? "")}"></label>`;
+  }
+  return `<label class="composition-schema-field composition-schema-json"><span>${escapeHtml(label)}</span><textarea data-composition-config-field="${escapeHtml(key)}" data-config-type="json" rows="3">${escapeHtml(JSON.stringify(value ?? (type === "array" ? [] : {}), null, 2))}</textarea></label>`;
+}
+
+function renderCompositionSettings(node, record, rawOpen = false) {
+  const properties = Object.entries(record?.settingsSchema?.properties ?? {});
+  const kind = node?.kind === "domain" ? "Domain" : "Kit";
+  return `<section class="composition-settings"><div class="config-list-title"><span>${kind} Settings</span><code>${escapeHtml(record?.status ?? "unknown")}</code></div>
+    ${properties.length ? `<div class="composition-schema-fields">${properties.map(([key, schema]) => renderCompositionSchemaField(key, schema, node?.config?.[key])).join("")}</div>` : `<small>No declared ${kind.toLowerCase()} settings.</small>`}
+    <details class="composition-raw-config" ${rawOpen ? "open" : ""}><summary>Advanced raw JSON</summary><textarea id="composition-config-json" rows="7" spellcheck="false">${escapeHtml(JSON.stringify(node?.config ?? {}, null, 2))}</textarea></details>
+  </section>`;
+}
+
+function renderCompositionInspector() {
+  const controller = state.compositionController;
+  if (!controller?.supported) return `<div class="composer-unavailable"><strong>Registry v2 required</strong><span>${escapeHtml(controller?.reason ?? "")}</span></div>`;
+  const node = controller.getSelectedNode();
+  const record = controller.getRecord?.(node) ?? compositionRecord(node);
+  const report = controller.getValidation();
+  const issues = report.errors?.filter((entry) => !entry.nodeId || entry.nodeId === node?.id) ?? [];
+  const receipts = controller.getReceipts().slice(-3).reverse();
+  const isRoot = node?.id === state.project.composition?.rootNodeId;
+  return `
+    <div class="selected-kit composition-selection">
+      <span class="selected-kit-icon">${node?.kind === "domain" ? "◈" : "◇"}</span>
+      <span class="selected-kit-copy"><strong>${escapeHtml(compositionNodeLabel(node))}</strong><small>${escapeHtml(record?.domainPath ?? node?.registryId ?? "No node")}</small></span>
+      <span class="domain-status ${node?.enabled ? "ready" : "attention"}"></span>
+    </div>
+    <label class="toggle-row"><span>Enabled</span><button type="button" id="composition-node-enabled" class="toggle ${node?.enabled ? "on" : ""}" aria-pressed="${node?.enabled ? "true" : "false"}" ${isRoot ? "disabled" : ""}><span></span></button></label>
+    <label class="field-row">Display label<input id="composition-node-label" type="text" value="${escapeHtml(node?.labelOverride ?? "")}" placeholder="${escapeHtml(record?.label ?? record?.metadata?.label ?? "Use registry label")}"></label>
+    ${node?.kind === "domain" ? `
+      <section class="composition-boundary"><div class="config-list-title"><span>What this area owns</span><code>${escapeHtml(record?.status ?? "unknown")}</code></div>
+        <p>${escapeHtml(record?.ownedMeaning?.[0] ?? "Natural-language meaning is supplied by the registry.")}</p>
+        <small>Does not own: ${escapeHtml((record?.forbiddenResponsibilities ?? []).slice(0, 3).join(" · ") || "none declared")}</small>
+      </section>` : ""}
+    ${renderCompositionSettings(node, record, issues.length > 0)}
+    ${issues.length ? `<div class="composition-issues">${issues.map((entry) => `<span><strong>${escapeHtml(entry.code)}</strong>${escapeHtml(entry.message)}</span>`).join("")}</div>` : ""}
+    <button id="composition-remove" type="button" class="wide-action secondary" ${isRoot ? "disabled" : ""}>Remove selected</button>
+    <details class="composition-advanced"><summary>Advanced registry details</summary>
+      <div><small>Registry ID</small><code>${escapeHtml(record?.id ?? "")}</code></div>
+      <div><small>Owning domain</small><code>${escapeHtml(record?.domainPath ?? "")}</code></div>
+      <div><small>API</small><code>${escapeHtml([record?.apiName, record?.apiVisibility].filter(Boolean).join(" · ") || "not declared")}</code></div>
+      <div><small>Requires</small><code>${escapeHtml((record?.requires ?? []).join(", ") || "none")}</code></div>
+      <div><small>Provides</small><code>${escapeHtml((record?.provides ?? []).join(", ") || "none")}</code></div>
+      <div><small>Source</small><code>${escapeHtml(record?.source?.registryId ?? record?.sourceRegistryId ?? "unknown")}</code></div>
+      <div><small>Trusted export</small><code>${escapeHtml(record?.source?.trusted ? record.source.exportName : "no")}</code></div>
+      ${record?.metadata?.performance ? `<div><small>Performance</small><code>${escapeHtml(JSON.stringify(record.metadata.performance))}</code></div>` : ""}
+    </details>
+    <section class="preview-receipts"><div class="config-list-title"><span>Recent previews</span><code>${controller.getReceipts().length}/20</code></div>
+      ${receipts.map((receipt) => `<div class="preview-receipt ${receipt.ok ? "ok" : "error"}"><strong>${escapeHtml(receipt.verdict)}</strong><span>${escapeHtml(receipt.error ?? `${receipt.installOrder?.length ?? 0} kits · ${Math.round(receipt.durationMs ?? 0)}ms`)}</span></div>`).join("") || "<small>No preview has run.</small>"}
+    </section>`;
 }
 
 function renderDomainStack() {
@@ -812,7 +1241,7 @@ function renderConfigPanel() {
   const gravity = config.gravity ?? { x: 0, y: 0, z: 0 };
   const visibleObjectCount = state.editorRuntime.getBinding("sceneObject").getVisibleObjects().length;
   const visibleObjectLabel = state.sceneObjectView.query ? `Filtered Objects (${visibleObjectCount})` : `Visible Objects (${visibleObjectCount})`;
-  const configBody = state.configureSubject === "sequence-step" ? renderSequenceStepConfig() : selected?.domainPath === "n:scene" ? renderSceneConfig(selected) : selected?.domainPath === "n:render:three" ? renderViewportConfig(selected, config) : selected?.domainPath === "n:build:web" ? renderBuildConfig(selected, config) : selected?.domainPath === "n:persistence" ? renderPersistenceConfig(selected, config) : `
+  const configBody = state.configureSubject === "composition" ? renderCompositionInspector() : state.configureSubject === "sequence-step" ? renderSequenceStepConfig() : selected?.domainPath === "n:scene" ? renderSceneConfig(selected) : selected?.domainPath === "n:render:three" ? renderViewportConfig(selected, config) : selected?.domainPath === "n:build:web" ? renderBuildConfig(selected, config) : selected?.domainPath === "n:persistence" ? renderPersistenceConfig(selected, config) : `
     <div class="selected-kit">
       <span class="selected-kit-icon">□</span>
       <span class="selected-kit-copy"><strong>${selected?.domainPath ?? "n:scene"}</strong><small>${selected?.subtitle ?? "Domain Service Kit"}</small></span>
@@ -849,8 +1278,8 @@ function renderConfigPanel() {
   return `
     <div class="panel-title">
       <span class="dock-anchor">⌝</span>
-      <h2>Configure</h2>
-      <button type="button" class="panel-close" aria-label="Close configure">×</button>
+      <h2>Inspector</h2>
+      <span class="panel-context-label">Selected settings</span>
     </div>
     ${configBody}
   `;
@@ -980,13 +1409,27 @@ function renderViewportStats(stats = getProjectedViewportStats()) {
 
 function renderViewportTools() {
   const active = state.editorRuntime.getBinding("viewportTools").getState().active;
+  const authoringViews = Array.isArray(state.project.scene3d?.authoringViews) ? state.project.scene3d.authoringViews : [];
+  const activeViewId = state.project.scene3d?.activeAuthoringViewId ?? authoringViews[0]?.id ?? "";
   return `
     <div class="viewport-tools" aria-label="Viewport tools">
       ${VIEWPORT_TOOL_BUTTONS.slice(0, 4).map((tool) => `<button class="${active === tool.id ? "active" : ""}" type="button" title="${tool.title}" data-viewport-tool="${tool.id}" aria-pressed="${active === tool.id ? "true" : "false"}">${tool.label}</button>`).join("")}
       <button id="add-object-viewport" type="button" title="Add cube">□+</button>
       ${VIEWPORT_TOOL_BUTTONS.slice(4).map((tool) => `<button class="${active === tool.id ? "active" : ""}" type="button" title="${tool.title}" data-viewport-tool="${tool.id}" aria-pressed="${active === tool.id ? "true" : "false"}">${tool.label}</button>`).join("")}
+      ${authoringViews.length ? `<label class="viewport-view-picker" title="Choose an authored world view; drag to orbit, Shift-drag to pan, and use the wheel to zoom"><span>View</span><select id="viewport-authoring-view">${authoringViews.map((view) => `<option value="${escapeHtml(view.id)}" ${view.id === activeViewId ? "selected" : ""}>${escapeHtml(view.label)}</option>`).join("")}</select></label>` : ""}
     </div>
   `;
+}
+
+function selectAuthoringView(viewId) {
+  const view = state.project.scene3d?.authoringViews?.find((entry) => entry.id === viewId);
+  if (!view) return;
+  state.project.scene3d.activeAuthoringViewId = view.id;
+  state.project.scene3d.camera.position = { ...view.position };
+  state.project.scene3d.camera.target = { ...view.target };
+  if (Number.isFinite(Number(view.fov))) state.project.scene3d.camera.fov = Number(view.fov);
+  recordEditorEvent(state, "editor.viewport.view.selected", { domainPath: "n:editor:viewport", viewId: view.id });
+  render();
 }
 
 function renderViewportTransformControls() {
@@ -1019,77 +1462,143 @@ function updateViewportStats(stats) {
     element.dataset.renderer = stats.renderer;
     element.innerHTML = `<strong>${escapeHtml(stats.renderer)}</strong><span>${stats.drawnObjects} drawn · ${stats.culledObjects} culled</span><small>${stats.totalObjects} scene objects · ${escapeHtml(stats.culling)}</small>`;
   }
-  window.__NEXUS_VIEWPORT_RENDERER__ = { type: viewportRenderer?.type ?? "unknown", stats: state.viewportRenderStats };
+  window.__NEXUS_VIEWPORT_RENDERER__ = {
+    type: viewportRenderer?.type ?? "unknown",
+    stats: state.viewportRenderStats,
+    camera: viewportRenderer?.getCamera?.() ?? null
+  };
+}
+
+function renderViewportStage(playableUrl) {
+  if (playableUrl) {
+    return `<iframe id="playable-game-frame" class="playable-game-frame" src="${escapeHtml(playableUrl)}" title="Play ${escapeHtml(state.project.playable?.title ?? state.project.title)}" allow="fullscreen; gamepad" referrerpolicy="no-referrer"></iframe>`;
+  }
+  const hasSpatialAuthoringMap = state.project.scene3d?.generatedGame?.authoringMapSchema === "nexusengine.game-authoring-map/1";
+  const legacySelectionProxy = hasSpatialAuthoringMap ? "" : `
+    <div class="camera-frustum"><span>Main Camera</span></div>
+    <div class="light-rig"><span>☼</span></div>
+    <button class="default-cube" id="select-cube" type="button" aria-label="${getSceneObject(state.project, state.selectedObjectId)?.label ?? "Default Cube"}">
+      <span class="cube-face cube-front"></span>
+      <span class="cube-face cube-top"></span>
+      <span class="cube-face cube-side"></span>
+    </button>
+    <div class="transform-gizmo" aria-hidden="true">
+      <span class="gizmo-axis gizmo-y"></span>
+      <span class="gizmo-axis gizmo-x"></span>
+      <span class="gizmo-axis gizmo-z"></span>
+      <span class="gizmo-core"></span>
+    </div>`;
+  return `
+    <canvas id="viewport-canvas" class="viewport-canvas" aria-label="WebGL 3D viewport"></canvas>
+    <div class="horizon"></div>
+    <div class="grid-floor"></div>
+    <div class="red-axis"></div>
+    <div class="green-axis"></div>
+    ${legacySelectionProxy}
+    <div class="axis-widget" aria-hidden="true">
+      <span class="axis-dot axis-y">Y</span><span class="axis-dot axis-z">Z</span><span class="axis-dot axis-x">X</span>
+    </div>`;
 }
 
 function render() {
   const manifest = buildEditorExportManifest(state.project);
   const persistenceStatus = state.editorRuntime.getBinding("projectPersistence").getStatus();
+  const compositionReport = state.compositionController?.getValidation?.() ?? { ok: false };
+  const compositionDirty = state.compositionController?.isDirty?.() === true;
+  const compositionBlocked = !state.compositionController?.supported || compositionDirty || !compositionReport.ok;
+  const actionReason = !state.compositionController?.supported
+    ? "Composition Tree support is unavailable."
+    : compositionDirty
+      ? "Apply the current draft first."
+      : !compositionReport.ok
+        ? "Resolve composition validation errors first."
+        : "";
+  const timelineExpanded = state.workspaceUi?.timelineExpanded === true;
+  const activeContext = WORKSPACE_CONTEXTS.has(state.workspaceUi?.activeContext) ? state.workspaceUi.activeContext : "structure";
+  const projectActionsOpen = state.workspaceUi?.projectActionsOpen === true;
+  const playableUrl = state.mode === "playing" ? resolvePlayableEntry() : null;
+  const actionGuidance = state.mode === "playing" ? "" : actionReason || state.compositionUi.message || "";
+  const workspaceStyle = [
+    `--structure-size:${Math.round(state.workspaceUi.structureWidth)}px`,
+    `--inspector-size:${Math.round(state.workspaceUi.inspectorWidth)}px`,
+    `--context-size:${Math.round(state.workspaceUi.contextWidth)}px`,
+    `--behavior-size:${timelineExpanded ? Math.round(state.workspaceUi.behaviorHeight) : 42}px`,
+    `--compact-context-size:${Math.round(state.workspaceUi.compactContextHeight)}px`
+  ].join(";");
   state.viewportRenderStats = getProjectedViewportStats();
   viewportRenderer?.dispose();
   root.innerHTML = `
     <header class="command-strip" data-domain-path="n:editor:header">
       <div class="brand-lockup"><strong>NexusEngine Editor</strong><span>${state.project.title}</span></div>
-      <nav class="command-buttons" aria-label="Editor commands">
-        <button id="play" class="primary"><span>▶</span>Play</button>
-        <button id="stop"><span>■</span>Stop</button>
-        <button id="save"><span>▣</span>Save</button>
-        <button id="load" ${persistenceStatus.hasLocalSnapshot ? "" : "disabled"}><span>↥</span>Load</button>
-        <button id="new-project"><span>◇</span>New</button>
-        <button id="build"><span>&lt;/&gt;</span><span class="label-full">Build HTML</span><span class="label-short">Build</span></button>
-        <button id="download" ${state.build.status === "ready" ? "" : "disabled"}><span>◎</span>Export</button>
+      <nav class="command-buttons hero-commands" aria-label="Composition commands">
+        <button id="composition-add-toggle" type="button" ${state.compositionController?.supported ? "" : "disabled"} ${state.mode === "playing" ? "hidden" : ""} title="Add a registered game domain or behavior kit">+ Add<span class="wide-label"> System</span></button>
+        <button id="composition-apply" type="button" ${compositionDirty ? "" : "disabled"} ${state.mode === "playing" ? "hidden" : ""} title="${compositionDirty ? "Validate and accept this draft" : "No unapplied draft changes"}">Apply<span class="wide-label"> Changes</span></button>
+        <button id="composition-run-once" type="button" ${compositionBlocked ? "disabled" : ""} ${state.mode === "playing" ? "hidden" : ""} title="${escapeHtml(actionReason || "Preview the selected scope once in a disposable engine")}">Preview</button>
+        <button id="play" class="primary" ${compositionBlocked || state.mode === "playing" ? "disabled" : ""} ${state.mode === "playing" ? "hidden" : ""} title="${escapeHtml(actionReason || "Play the accepted composition")}"><span>▶</span>Play</button>
+        <button id="stop" ${state.mode === "playing" ? "" : "disabled hidden"} title="Stop the running preview"><span>■</span>Stop</button>
       </nav>
-      <span class="status-pill ${state.mode === "playing" ? "playing" : ""}"><span></span>${renderStatusLabel()}</span>
+      <div class="command-end">
+        <button id="project-actions-toggle" class="project-actions-toggle" type="button" ${state.mode === "playing" ? "hidden" : ""} aria-expanded="${projectActionsOpen}" aria-controls="project-actions">Project <span>${projectActionsOpen ? "▴" : "▾"}</span></button>
+        <span class="status-pill ${state.mode === "playing" ? "playing" : ""}"><span></span>${renderStatusLabel()}</span>
+      </div>
+      <div class="action-guidance" aria-live="polite" ${actionGuidance ? "" : "hidden"}>${escapeHtml(actionGuidance)}</div>
     </header>
-    <main class="editor-viewport" data-domain-path="n:editor:viewport">
-      <section class="scene-stage" aria-label="3D editor viewport">
-        <canvas id="viewport-canvas" class="viewport-canvas" aria-label="WebGL 3D viewport"></canvas>
-        <div class="horizon"></div>
-        <div class="grid-floor"></div>
-        <div class="red-axis"></div>
-        <div class="green-axis"></div>
-        <div class="camera-frustum"><span>Main Camera</span></div>
-        <div class="light-rig"><span>☼</span></div>
-        <button class="default-cube" id="select-cube" type="button" aria-label="${getSceneObject(state.project, state.selectedObjectId)?.label ?? "Default Cube"}">
-          <span class="cube-face cube-front"></span>
-          <span class="cube-face cube-top"></span>
-          <span class="cube-face cube-side"></span>
-        </button>
-        <div class="transform-gizmo" aria-hidden="true">
-          <span class="gizmo-axis gizmo-y"></span>
-          <span class="gizmo-axis gizmo-x"></span>
-          <span class="gizmo-axis gizmo-z"></span>
-          <span class="gizmo-core"></span>
-        </div>
-        <div class="axis-widget" aria-hidden="true">
-          <span class="axis-dot axis-y">Y</span><span class="axis-dot axis-z">Z</span><span class="axis-dot axis-x">X</span>
-        </div>
-        ${renderViewportTools()}
-        ${renderViewportTransformControls()}
-        ${renderViewportStats(state.viewportRenderStats)}
-      </section>
-
-      <aside class="overlay-panel domain-stack-panel ${state.kitPicker.open ? "picker-open" : ""} ${state.domainStackView.mode === "map" ? "map-open" : ""}" data-panel="domainStack" data-domain-path="n:editor:dock:kits" ${panelStyle("domainStack")}>
-        <div class="panel-title"><span class="dock-anchor">⌜</span><h2>Domain Stack</h2><button type="button" class="panel-close" aria-label="Close domain stack">×</button></div>
-        ${renderDomainStackScaleControls()}
-        ${renderKitPicker()}
-        <div class="${state.domainStackView.mode === "map" ? "domain-map" : "domain-list"}">${state.domainStackView.mode === "map" ? renderDomainMap() : renderDomainStack()}</div>
-        <div class="panel-actions"><button id="add-kit" type="button" aria-expanded="${state.kitPicker.open ? "true" : "false"}">${state.kitPicker.open ? "Hide Details" : "Kit Details"}</button><button id="reorder-kit" type="button">↕ Reorder</button></div>
+    <section id="project-actions" class="project-actions-strip" aria-label="Project actions" ${projectActionsOpen ? "" : "hidden"}>
+      <button id="new-project" type="button"><span>◇</span>New</button>
+      <button id="save" type="button"><span>▣</span>Save</button>
+      <button id="load" type="button" ${persistenceStatus.hasLocalSnapshot ? "" : "disabled"}><span>↥</span>Load</button>
+      <button id="build" type="button" ${compositionBlocked ? "disabled" : ""} title="${escapeHtml(actionReason)}"><span>&lt;/&gt;</span>Build HTML</button>
+      <button id="download" type="button" ${state.build.status === "ready" ? "" : "disabled"}><span>◎</span>Export HTML</button>
+      <button id="reset-workspace-layout" type="button"><span>↺</span>Reset Layout</button>
+    </section>
+    <main class="editor-workspace ${timelineExpanded ? "timeline-expanded" : "timeline-collapsed"}" data-active-context="${activeContext}" data-mode="${state.mode}" data-domain-path="n:editor:viewport" style="${workspaceStyle}">
+      <aside class="workspace-dock composer-panel" data-panel="domainStack" data-domain-path="n:editor:dock:kits">
+        ${renderCompositionPanel()}
       </aside>
 
-      <aside class="overlay-panel configure-panel" data-panel="configure" data-domain-path="n:editor:dock:inspector" ${panelStyle("configure")}>
+      <div class="workspace-resizer workspace-resizer-structure" data-workspace-resize="structure" role="separator" tabindex="0" aria-label="Resize Game Structure" aria-orientation="vertical" aria-valuemin="220" aria-valuemax="360" aria-valuenow="${state.workspaceUi.structureWidth}"></div>
+
+      <section class="viewport-pane" aria-label="3D editor viewport">
+       <header class="viewport-command-row">
+        ${renderViewportTools()}
+       ${renderViewportTransformControls()}
+       </header>
+       <section class="scene-stage" data-content="${playableUrl ? "playable-game" : "authoring-scene"}">${renderViewportStage(playableUrl)}</section>
+       <footer class="viewport-status-row">${renderViewportStats(state.viewportRenderStats)}</footer>
+      </section>
+
+      <div class="workspace-resizer workspace-resizer-inspector" data-workspace-resize="inspector" role="separator" tabindex="0" aria-label="Resize Inspector" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="440" aria-valuenow="${state.workspaceUi.inspectorWidth}"></div>
+      <div class="workspace-resizer workspace-resizer-context" data-workspace-resize="context" role="separator" tabindex="0" aria-label="Resize contextual workspace" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="420" aria-valuenow="${state.workspaceUi.contextWidth}"></div>
+
+      <aside class="workspace-dock configure-panel" data-panel="configure" data-domain-path="n:editor:dock:inspector">
         ${renderConfigPanel()}
       </aside>
 
-      <aside class="overlay-panel sequence-panel" data-panel="sequence" data-domain-path="n:editor:dock:sequence" ${panelStyle("sequence")}>
-        <div class="panel-title"><span class="dock-anchor">▔</span><h2>Sequence Timeline</h2><button type="button" class="panel-close" aria-label="Close sequence timeline">×</button></div>
-        <div class="sequence-steps">${renderSequenceSteps()}</div>
-        ${renderSequenceLinkEditor()}
-        ${renderSequencePlayback()}
-        <div class="panel-actions timeline-actions"><button id="add-step" type="button">+ Step</button><button id="link-event" type="button">↗ Link Event</button><button id="validate-sequence" type="button">✓ Validate</button></div>
-        <div class="panel-actions timeline-run-actions"><button id="run-step" type="button">▶ Step</button><button id="run-sequence" type="button">▶ Sequence</button><button id="reset-sequence" type="button">Reset</button></div>
-        <div class="proof-line" aria-live="polite">${state.build.status === "ready" ? `${state.build.fileName} · ${state.build.bytes} bytes` : renderProofEvents()}</div>
-      </aside>
+      <nav class="workspace-context-tabs" aria-label="Workspace regions">
+        <button type="button" data-workspace-context="structure" class="${activeContext === "structure" ? "active" : ""}">Structure</button>
+        <button type="button" data-workspace-context="inspector" class="${activeContext === "inspector" ? "active" : ""}">Inspector</button>
+        <button type="button" data-workspace-context="behavior" class="${activeContext === "behavior" ? "active" : ""}">Behaviors</button>
+      </nav>
+
+      <div class="workspace-resizer workspace-resizer-behavior" data-workspace-resize="behavior" role="separator" tabindex="0" aria-label="Resize Behaviors" aria-orientation="horizontal" aria-valuemin="180" aria-valuemax="420" aria-valuenow="${state.workspaceUi.behaviorHeight}"></div>
+      <div class="workspace-resizer workspace-resizer-compact" data-workspace-resize="compact" role="separator" tabindex="0" aria-label="Resize contextual workspace" aria-orientation="horizontal" aria-valuemin="220" aria-valuemax="420" aria-valuenow="${state.workspaceUi.compactContextHeight}"></div>
+
+      <section class="workspace-dock sequence-panel ${timelineExpanded ? "expanded" : "collapsed"}" data-panel="sequence" data-domain-path="n:editor:dock:sequence">
+        <button type="button" id="timeline-toggle" class="timeline-toggle" aria-expanded="${timelineExpanded}">
+          <span class="timeline-chevron">${timelineExpanded ? "▾" : "▸"}</span>
+          <strong>Behaviors &amp; Automation</strong>
+          <span>${state.project.sequenceSteps.length} steps · ${state.editorRuntime.getBinding("sequenceTimeline").getPlayback().runCount} receipts</span>
+          <small>${timelineExpanded ? "Collapse" : "Sequence Timeline"}</small>
+        </button>
+        <div class="timeline-content">
+          <div class="sequence-steps">${renderSequenceSteps()}</div>
+          ${renderSequenceLinkEditor()}
+          ${renderSequencePlayback()}
+          <div class="panel-actions timeline-actions"><button id="add-step" type="button">+ Step</button><button id="link-event" type="button">↗ Link Event</button><button id="validate-sequence" type="button">✓ Validate</button></div>
+          <div class="panel-actions timeline-run-actions"><button id="run-step" type="button">▶ Step</button><button id="run-sequence" type="button">▶ Sequence</button><button id="reset-sequence" type="button">Reset</button></div>
+          <div class="proof-line" aria-live="polite">${state.build.status === "ready" ? `${state.build.fileName} · ${state.build.bytes} bytes` : renderProofEvents()}</div>
+        </div>
+      </section>
 
       <script type="application/json" id="project-manifest">${JSON.stringify(manifest).replaceAll("<", "\\u003c")}</script>
       <script type="application/json" id="runtime-manifest">${JSON.stringify(state.editorRuntime.getSnapshot()).replaceAll("<", "\\u003c")}</script>
@@ -1099,6 +1608,8 @@ function render() {
 
   root.querySelector("#play").addEventListener("click", () => playEditor());
   root.querySelector("#stop").addEventListener("click", () => setMode("stopped"));
+  root.querySelector("#project-actions-toggle").addEventListener("click", () => toggleProjectActions());
+  root.querySelector("#reset-workspace-layout").addEventListener("click", () => resetWorkspaceLayout());
   root.querySelector("#save").addEventListener("click", () => saveProject());
   root.querySelector("#load").addEventListener("click", () => loadProject());
   root.querySelector("#new-project").addEventListener("click", () => resetProject());
@@ -1122,17 +1633,58 @@ function render() {
   root.querySelector("#map-view")?.addEventListener("click", () => setDomainStackView("map"));
   root.querySelector("#domain-stack-search")?.addEventListener("change", (event) => updateDomainStackSearch(event.target.value));
   root.querySelector("#domain-health-filter")?.addEventListener("change", (event) => updateDomainStackHealth(event.target.value));
-  root.querySelector("#add-kit").addEventListener("click", () => toggleKitPicker());
+  root.querySelector("#add-kit")?.addEventListener("click", () => toggleKitPicker());
   root.querySelector("#kit-search")?.addEventListener("change", (event) => updateKitPickerQuery(event.target.value));
   root.querySelector("#kit-category")?.addEventListener("change", (event) => updateKitPickerCategory(event.target.value));
   root.querySelector("#kit-select")?.addEventListener("change", (event) => selectRegistryKit(event.target.value));
-  root.querySelector("#reorder-kit").addEventListener("click", () => reorderKit());
-  root.querySelector("#add-step").addEventListener("click", () => addStep());
-  root.querySelector("#link-event").addEventListener("click", () => linkEvent());
-  root.querySelector("#validate-sequence").addEventListener("click", () => validateSequence());
-  root.querySelector("#run-step").addEventListener("click", () => runSequenceStep());
-  root.querySelector("#run-sequence").addEventListener("click", () => runSequenceAll());
-  root.querySelector("#reset-sequence").addEventListener("click", () => resetSequencePlayback());
+  root.querySelector("#reorder-kit")?.addEventListener("click", () => reorderKit());
+  root.querySelector("#composition-add-toggle")?.addEventListener("click", () => toggleCompositionAdd());
+  root.querySelector("#composition-apply")?.addEventListener("click", () => applyCompositionDraft());
+  root.querySelector("#composition-run-once")?.addEventListener("click", () => runCompositionOnce());
+  root.querySelector("#timeline-toggle")?.addEventListener("click", () => toggleTimeline());
+  for (const button of root.querySelectorAll("[data-workspace-context]")) {
+    button.addEventListener("click", () => setWorkspaceContext(button.dataset.workspaceContext));
+  }
+  root.querySelector("#composition-add-search")?.addEventListener("input", (event) => {
+    state.compositionUi.addQuery = event.target.value;
+    render();
+  });
+  root.querySelector("#composition-add-select")?.addEventListener("change", (event) => {
+    state.compositionUi.selectedRegistryId = event.target.value;
+  });
+  root.querySelector("#composition-add-confirm")?.addEventListener("click", () => addCompositionReference());
+  for (const button of root.querySelectorAll("[data-add-kind]")) {
+    button.addEventListener("click", () => {
+      state.compositionUi.addKind = button.dataset.addKind;
+      state.compositionUi.selectedRegistryId = "";
+      render();
+    });
+  }
+  for (const button of root.querySelectorAll("[data-composition-node]")) {
+    button.addEventListener("click", () => selectCompositionNode(button.dataset.compositionNode));
+  }
+  root.querySelector("#composition-node-enabled")?.addEventListener("click", () => {
+    const node = state.compositionController.getSelectedNode();
+    state.compositionController.update({ enabled: !node.enabled });
+    state.compositionUi.message = "Draft enabled state changed; Apply is required.";
+    render();
+  });
+  root.querySelector("#composition-node-label")?.addEventListener("change", (event) => {
+    state.compositionController.update({ labelOverride: event.target.value });
+    state.compositionUi.message = "Draft label changed; Apply is required.";
+    render();
+  });
+  root.querySelector("#composition-config-json")?.addEventListener("change", (event) => updateCompositionConfig(event.target.value));
+  for (const field of root.querySelectorAll("[data-composition-config-field]")) {
+    field.addEventListener("change", () => updateCompositionConfigField(field.dataset.compositionConfigField, field.dataset.configType, field.value));
+  }
+  root.querySelector("#composition-remove")?.addEventListener("click", () => removeCompositionNode());
+  root.querySelector("#add-step")?.addEventListener("click", () => addStep());
+  root.querySelector("#link-event")?.addEventListener("click", () => linkEvent());
+  root.querySelector("#validate-sequence")?.addEventListener("click", () => validateSequence());
+  root.querySelector("#run-step")?.addEventListener("click", () => runSequenceStep());
+  root.querySelector("#run-sequence")?.addEventListener("click", () => runSequenceAll());
+  root.querySelector("#reset-sequence")?.addEventListener("click", () => resetSequencePlayback());
   root.querySelector("#sequence-source-domain")?.addEventListener("change", (event) => updateSequenceLink({ domainPath: event.target.value }));
   root.querySelector("#sequence-event")?.addEventListener("change", (event) => updateSequenceLink({ event: event.target.value }));
   root.querySelector("#sequence-target-domain")?.addEventListener("change", (event) => updateSequenceLink({ targetDomainPath: event.target.value }));
@@ -1148,11 +1700,12 @@ function render() {
   });
   root.querySelector("#config-run-step")?.addEventListener("click", () => runSequenceStep());
   root.querySelector("#config-validate-sequence")?.addEventListener("click", () => validateSequence());
-  root.querySelector("#select-cube").addEventListener("click", () => selectObject(state.selectedObjectId));
-  root.querySelector("#add-object-viewport").addEventListener("click", () => addObject());
+  root.querySelector("#select-cube")?.addEventListener("click", () => selectObject(state.selectedObjectId));
+  root.querySelector("#add-object-viewport")?.addEventListener("click", () => addObject());
   for (const button of root.querySelectorAll("[data-viewport-tool]")) {
     button.addEventListener("click", () => setViewportTool(button.dataset.viewportTool));
   }
+  root.querySelector("#viewport-authoring-view")?.addEventListener("change", (event) => selectAuthoringView(event.target.value));
   for (const button of root.querySelectorAll("[data-transform-axis]")) {
     button.addEventListener("click", () => nudgeViewportSelection(button.dataset.transformAxis, Number(button.dataset.transformDirection)));
   }
@@ -1231,57 +1784,44 @@ function render() {
       render();
     });
   }
-  bindPanelDragging();
-  viewportRenderer = createViewportRenderer(root.querySelector("#viewport-canvas"), state.project, {
-    getMode: () => state.mode,
-    viewportConfig: normalizeViewportRuntimeConfig(state.project),
-    onStats: updateViewportStats
-  });
-  window.__NEXUS_VIEWPORT_RENDERER__ = { type: viewportRenderer.type, stats: viewportRenderer.getStats?.() ?? state.viewportRenderStats };
+  const compositionTree = root.querySelector(".composition-tree");
+  const selectedCompositionNode = [...root.querySelectorAll("[data-composition-node]")]
+    .find((node) => node.dataset.compositionNode === state.compositionController?.getSelectedNode?.()?.id);
+  if (compositionTree && selectedCompositionNode) {
+    const treeRect = compositionTree.getBoundingClientRect();
+    const nodeRect = selectedCompositionNode.getBoundingClientRect();
+    if (nodeRect.top < treeRect.top) compositionTree.scrollTop -= treeRect.top - nodeRect.top;
+    else if (nodeRect.bottom > treeRect.bottom) compositionTree.scrollTop += nodeRect.bottom - treeRect.bottom;
+  }
+  bindWorkspaceResizers();
+  const playableFrame = root.querySelector("#playable-game-frame");
+  playableFrame?.addEventListener("load", () => {
+    if (state.playableRuntime) state.playableRuntime.status = "ready";
+    playableFrame.dataset.status = "ready";
+    recordEditorEvent(state, "editor.playable.ready", { domainPath: state.project.domainPath, playableId: state.project.playable?.id });
+  }, { once: true });
+  const viewportCanvas = root.querySelector("#viewport-canvas");
+  if (viewportCanvas) {
+    viewportRenderer = createViewportRenderer(viewportCanvas, state.project, {
+      getMode: () => state.mode,
+      viewportConfig: normalizeViewportRuntimeConfig(state.project),
+      onStats: updateViewportStats
+    });
+    window.__NEXUS_VIEWPORT_RENDERER__ = { type: viewportRenderer.type, stats: viewportRenderer.getStats?.() ?? state.viewportRenderStats };
+  } else {
+    viewportRenderer = null;
+    window.__NEXUS_VIEWPORT_RENDERER__ = { type: "playable-project", stats: null, entry: playableUrl };
+  }
   window.__NEXUS_EDITOR_RUNTIME__ = state.editorRuntime.getSnapshot();
   window.__NEXUS_EDITOR_STATE__ = state;
-}
-
-function bindPanelDragging() {
-  const viewport = root.querySelector(".editor-viewport");
-  if (!viewport) return;
-  for (const handle of root.querySelectorAll(".overlay-panel .drag-handle")) {
-    handle.addEventListener("pointerdown", (event) => {
-      const panel = event.currentTarget.closest(".overlay-panel");
-      if (!panel?.dataset.panel || DOCKED_PANELS.has(panel.dataset.panel)) return;
-      const viewportRect = viewport.getBoundingClientRect();
-      const panelRect = panel.getBoundingClientRect();
-      const origin = {
-        x: panelRect.left - viewportRect.left,
-        y: panelRect.top - viewportRect.top
-      };
-      const start = { x: event.clientX, y: event.clientY };
-      panel.setPointerCapture?.(event.pointerId);
-      panel.classList.add("dragging");
-      const move = (moveEvent) => {
-        const maxX = Math.max(0, viewportRect.width - panelRect.width);
-        const maxY = Math.max(0, viewportRect.height - panelRect.height);
-        const x = Math.min(maxX, Math.max(0, origin.x + moveEvent.clientX - start.x));
-        const y = Math.min(maxY, Math.max(0, origin.y + moveEvent.clientY - start.y));
-        panel.style.left = `${x}px`;
-        panel.style.top = `${y}px`;
-        panel.style.right = "auto";
-        panel.style.bottom = "auto";
-        panel.style.transform = "none";
-        state.panelPositions[panel.dataset.panel] = { x: Math.round(x), y: Math.round(y) };
-      };
-      const up = () => {
-        panel.classList.remove("dragging");
-        panel.removeEventListener("pointermove", move);
-        panel.removeEventListener("pointerup", up);
-        panel.removeEventListener("pointercancel", up);
-        recordEditorEvent(state, "editor.panel.dragged", { domainPath: panel.dataset.domainPath, panel: panel.dataset.panel });
-      };
-      panel.addEventListener("pointermove", move);
-      panel.addEventListener("pointerup", up);
-      panel.addEventListener("pointercancel", up);
-    });
-  }
+  window.__NEXUS_COMPOSITION__ = {
+    supported: state.compositionController?.supported === true,
+    source: nexusEngineLoad.source,
+    dirty: state.compositionController?.isDirty?.() === true,
+    validation: state.compositionController?.getValidation?.() ?? null,
+    tree: state.compositionController?.getTree?.() ?? null,
+    receipts: state.compositionController?.getReceipts?.() ?? []
+  };
 }
 
 render();

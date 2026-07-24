@@ -6,7 +6,7 @@ export const EDITOR_KITS = Object.freeze([
   { id: "editor-root-kit", domainPath: "n:editor", label: "Editor Root", role: "root" },
   { id: "editor-viewport-kit", domainPath: "n:editor:viewport", label: "3D Viewport", role: "full-3d-scene-viewport" },
   { id: "editor-command-strip-kit", domainPath: "n:editor:header", label: "Command Strip", role: "play-stop-save-build-export" },
-  { id: "editor-overlay-panel-kit", domainPath: "n:editor:dock", label: "Docked Panel System", role: "docked-overlay-shell" },
+  { id: "editor-overlay-panel-kit", domainPath: "n:editor:dock", label: "Docked Workspace System", role: "fixed-workspace-shell" },
   { id: "editor-domain-stack-kit", domainPath: "n:editor:dock:kits", label: "Domain Stack Panel", role: "left-domain-stack" },
   { id: "editor-configure-panel-kit", domainPath: "n:editor:dock:inspector", label: "Configure Panel", role: "right-configure" },
   { id: "editor-sequence-timeline-kit", domainPath: "n:editor:dock:sequence", label: "Sequence Timeline", role: "bottom-sequence" },
@@ -61,6 +61,13 @@ export function createEditorState() {
       selectedKitId: "spatial-authoring-kits",
       lastInstallPlan: null
     },
+    compositionUi: {
+      addOpen: false,
+      addKind: "domain",
+      addQuery: "",
+      selectedRegistryId: "",
+      message: ""
+    },
     viewportTool: {
       active: "select",
       nudgeStep: 0.25,
@@ -68,7 +75,17 @@ export function createEditorState() {
       scaleStep: 0.1,
       lastAction: ""
     },
-    panelPositions: {},
+    workspaceUi: {
+      timelineExpanded: false,
+      inspectorOpen: true,
+      projectActionsOpen: false,
+      activeContext: "structure",
+      structureWidth: 270,
+      inspectorWidth: 320,
+      contextWidth: 320,
+      behaviorHeight: 260,
+      compactContextHeight: 300
+    },
     viewportRenderStats: {
       renderer: "webgl",
       culling: "distance-window",

@@ -1,6 +1,38 @@
 import { listEditorFeatureContracts, validateEditorFeatureContracts } from "./kits/editor-feature-contracts-kit/index.js";
+import { EDITOR_PROJECT_VERSION, ensureProjectComposition, rebuildProjectCompositionFromLegacy } from "./editor-composition.js";
 
 const DEFAULT_VECTOR = Object.freeze({ x: 0, y: 0, z: 0 });
+export const PLAYABLE_PROJECT_SCHEMA = "nexusengine.playable-project/1";
+
+function normalizePlayableEntry(value) {
+  const entry = String(value ?? "").trim();
+  if (!entry) throw new TypeError("Playable project entry is required.");
+  if (entry.includes("\\") || entry.includes("\0")) throw new TypeError("Playable project entry must use URL path syntax.");
+  const path = entry.split(/[?#]/, 1)[0];
+  if (path.split("/").includes("..")) throw new TypeError("Playable project entry cannot escape its project boundary.");
+  if (/^[a-z][a-z0-9+.-]*:/i.test(entry) || entry.startsWith("//")) {
+    throw new TypeError("Playable project entry must be a relative or same-workspace root path.");
+  }
+  return entry;
+}
+
+export function normalizePlayableProject(input = null) {
+  if (input == null) return null;
+  if (input.schema !== PLAYABLE_PROJECT_SCHEMA) throw new TypeError(`Playable project schema must be ${PLAYABLE_PROJECT_SCHEMA}.`);
+  const id = String(input.id ?? "").trim();
+  const title = String(input.title ?? "").trim();
+  if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(id)) throw new TypeError("Playable project id must be a lowercase kebab-case identifier.");
+  if (!title) throw new TypeError("Playable project title is required.");
+  return {
+    schema: PLAYABLE_PROJECT_SCHEMA,
+    id,
+    title,
+    entry: normalizePlayableEntry(input.entry),
+    runtime: input.runtime === "nexusengine-webgl2" ? input.runtime : "nexusengine-webgl2",
+    contractHash: String(input.contractHash ?? ""),
+    proofAdapter: input.proofAdapter === false ? null : "window.__NEXUS_GAME_PROOF__"
+  };
+}
 
 export const ADDABLE_DOMAIN_KITS = Object.freeze([
   {
@@ -462,7 +494,7 @@ export const GAME_AUTHORING_TEMPLATES = Object.freeze([
 export const DEFAULT_EDITOR_PROJECT = Object.freeze({
   title: "Starter 3D Scene",
   domainPath: "n:game:starter",
-  version: "0.2.0",
+  version: EDITOR_PROJECT_VERSION,
   viewport: {
     mode: "3d",
     width: 1280,
@@ -681,7 +713,8 @@ export function createEditorProject(input = DEFAULT_EDITOR_PROJECT) {
   project.sequenceSteps = Array.isArray(input.sequenceSteps) && input.sequenceSteps.length
     ? clone(input.sequenceSteps)
     : clone(DEFAULT_EDITOR_PROJECT.sequenceSteps);
-  return project;
+  project.playable = normalizePlayableProject(input.playable ?? null);
+  return ensureProjectComposition(project);
 }
 
 export function createEditorProjectFileName(projectOrSnapshot = DEFAULT_EDITOR_PROJECT) {
@@ -698,16 +731,29 @@ export function createEditorProjectFileName(projectOrSnapshot = DEFAULT_EDITOR_P
 
 export function createEditorProjectSnapshot(project, editorState = {}) {
   return {
-    version: "0.1.0",
+    version: EDITOR_PROJECT_VERSION,
     savedAt: new Date().toISOString(),
     project: clone(project),
     selection: {
-      configureSubject: ["domain", "object", "sequence-step"].includes(editorState.configureSubject) ? editorState.configureSubject : "domain",
+      configureSubject: ["domain", "object", "sequence-step", "composition"].includes(editorState.configureSubject) ? editorState.configureSubject : "domain",
       domainPath: editorState.selectedDomainPath ?? "n:scene",
       sequenceStepId: editorState.selectedSequenceStepId ?? project.sequenceSteps?.[0]?.id ?? "",
-      objectId: editorState.selectedObjectId ?? project.scene3d?.objects?.[0]?.id ?? ""
+      objectId: editorState.selectedObjectId ?? project.scene3d?.objects?.[0]?.id ?? "",
+      compositionNodeId: editorState.compositionController?.getSelectedNode?.()?.id ?? project.composition?.rootNodeId ?? "game-root"
     },
-    panelPositions: {},
+    workspaceUi: {
+      timelineExpanded: editorState.workspaceUi?.timelineExpanded === true,
+      inspectorOpen: editorState.workspaceUi?.inspectorOpen !== false,
+      projectActionsOpen: false,
+      activeContext: ["structure", "inspector", "behavior"].includes(editorState.workspaceUi?.activeContext)
+        ? editorState.workspaceUi.activeContext
+        : "structure",
+      structureWidth: Math.max(220, Math.min(360, Number(editorState.workspaceUi?.structureWidth) || 270)),
+      inspectorWidth: Math.max(280, Math.min(440, Number(editorState.workspaceUi?.inspectorWidth) || 320)),
+      contextWidth: Math.max(280, Math.min(420, Number(editorState.workspaceUi?.contextWidth) || 320)),
+      behaviorHeight: Math.max(180, Math.min(420, Number(editorState.workspaceUi?.behaviorHeight) || 260)),
+      compactContextHeight: Math.max(220, Math.min(420, Number(editorState.workspaceUi?.compactContextHeight) || 300))
+    },
     domainStackView: clone(editorState.domainStackView ?? {}),
     sceneObjectView: clone(editorState.sceneObjectView ?? {}),
     gameTemplateView: clone(editorState.gameTemplateView ?? {}),
@@ -728,11 +774,23 @@ export function applyEditorProjectSnapshot(editorState, snapshot = {}) {
   editorState.selectedObjectId = snapshot.selection?.objectId && project.scene3d.objects.some((object) => object.id === snapshot.selection.objectId)
     ? snapshot.selection.objectId
     : project.scene3d.objects[0]?.id ?? "";
-  editorState.configureSubject = ["domain", "object", "sequence-step"].includes(snapshot.selection?.configureSubject)
+  editorState.configureSubject = ["domain", "object", "sequence-step", "composition"].includes(snapshot.selection?.configureSubject)
     ? snapshot.selection.configureSubject
     : editorState.selectedDomainPath === "n:scene" ? "object" : "domain";
   selectSceneObject(project, editorState.selectedObjectId);
-  editorState.panelPositions = {};
+  editorState.workspaceUi = {
+    timelineExpanded: snapshot.workspaceUi?.timelineExpanded === true,
+    inspectorOpen: snapshot.workspaceUi?.inspectorOpen !== false,
+    projectActionsOpen: false,
+    activeContext: ["structure", "inspector", "behavior"].includes(snapshot.workspaceUi?.activeContext)
+      ? snapshot.workspaceUi.activeContext
+      : "structure",
+    structureWidth: Math.max(220, Math.min(360, Number(snapshot.workspaceUi?.structureWidth) || 270)),
+    inspectorWidth: Math.max(280, Math.min(440, Number(snapshot.workspaceUi?.inspectorWidth) || 320)),
+    contextWidth: Math.max(280, Math.min(420, Number(snapshot.workspaceUi?.contextWidth) || 320)),
+    behaviorHeight: Math.max(180, Math.min(420, Number(snapshot.workspaceUi?.behaviorHeight) || 260)),
+    compactContextHeight: Math.max(220, Math.min(420, Number(snapshot.workspaceUi?.compactContextHeight) || 300))
+  };
   editorState.domainStackView = {
     mode: snapshot.domainStackView?.mode === "map" ? "map" : "stack",
     query: String(snapshot.domainStackView?.query ?? ""),
@@ -1477,6 +1535,9 @@ export function assignDomainKitToObject(project, objectId, domainPath) {
   const object = getSceneObject(project, objectId);
   if (!object || typeof domainPath !== "string" || !domainPath.startsWith("n:")) return null;
   object.domainKits = Array.from(new Set([...(object.domainKits ?? []), domainPath]));
+  const registryId = project.domainStack.find((domain) => domain.domainPath === domainPath)?.kitId;
+  const kitNodeId = project.composition?.nodes?.find((node) => node.kind === "kit" && node.registryId === registryId)?.id;
+  if (kitNodeId) object.kitNodeIds = Array.from(new Set([...(object.kitNodeIds ?? []), kitNodeId]));
   return object;
 }
 
@@ -1567,6 +1628,7 @@ export function installDomainKitManifest(project, manifest = {}) {
     children: clone(kit.children),
     sourcePath: kit.path
   };
+  rebuildProjectCompositionFromLegacy(project);
   return kit;
 }
 
@@ -1605,6 +1667,7 @@ export function appendDomainKit(project, template = null) {
     children: clone(kit.children),
     sourcePath: kit.path
   };
+  rebuildProjectCompositionFromLegacy(project);
   return kit;
 }
 
@@ -1818,6 +1881,9 @@ export function buildEditorExportManifest(project) {
     title: project.title,
     domainPath: project.domainPath,
     version: project.version,
+    playable: normalizePlayableProject(project.playable ?? null),
+    composition: project.composition ? clone(project.composition) : null,
+    compositionRegistryOverlay: project.compositionRegistryOverlay ? clone(project.compositionRegistryOverlay) : null,
     viewport: clone(project.viewport),
     scene3d: clone(project.scene3d),
     domainStack: clone(project.domainStack),

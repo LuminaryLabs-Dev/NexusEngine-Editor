@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { createHash } from "node:crypto";
+import { copyFile, lstat, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, relative, resolve, sep } from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 import { buildDskGameHtml } from "../src/dsk-html-builder.js";
@@ -15,6 +16,23 @@ import { createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js
 import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 
 const OPERATIONS = Object.freeze({
+  "playable-export": {
+    summary: "Export the exact playable project as a self-contained local folder; authoring evidence and project-only files are excluded.",
+    params: {
+      input_project: "Required source .project.json path.",
+      output_dir: "Required new or empty output directory for the playable game."
+    },
+    async run(context, params, options) {
+      if (!context.inputProjectPath) throw new Error("playable-export requires --param input_project=<project-file>.");
+      const plan = await planPlayableExport(context.state, context.inputProjectPath, params.output_dir);
+      const outputs = options.write ? { playable: await writePlayableExport(plan) } : { playable: summarizePlayableExport(plan) };
+      return createReport(context.state, {
+        operation: "playable-export",
+        validation: context.state.editorRuntime.getBinding("sequenceTimeline").validate(),
+        outputs
+      });
+    }
+  },
   "install-kit": {
     summary: "Install a Domain Service Kit from the registry into a project file; this is the only kit-add mutation path.",
     params: {
@@ -187,6 +205,7 @@ function printUsage() {
   node scripts/nexus-engine-editor-cli.mjs operations submit <name> --param key=value
 
 Examples:
+  node scripts/nexus-engine-editor-cli.mjs operations submit playable-export --param input_project=game.project.json --param output_dir=dist/games/game
   node scripts/nexus-engine-editor-cli.mjs operations submit chess-game --param html=dist/games/nexus-chess.html --param project=dist/games/nexus-chess.project.json
   node scripts/nexus-engine-editor-cli.mjs interactive`);
 }
@@ -199,12 +218,131 @@ async function createContext(flags = {}) {
     recordEvent: (type, payload) => recordEditorEvent(state, type, payload)
   });
   const inputProject = flags.input_project || flags.project;
+  let inputProjectPath = null;
   if (inputProject) {
-    const projectPath = resolve(String(inputProject));
-    const serialized = await readFile(projectPath, "utf8");
-    state.editorRuntime.getBinding("projectPersistence").importFile(serialized, projectPath);
+    inputProjectPath = resolve(String(inputProject));
+    const serialized = await readFile(inputProjectPath, "utf8");
+    state.editorRuntime.getBinding("projectPersistence").importFile(serialized, inputProjectPath);
   }
-  return { state };
+  return { state, inputProjectPath };
+}
+
+const PLAYABLE_EXPORT_EXCLUDES = new Set([
+  ".agent",
+  ".git",
+  ".playwright-cli",
+  "editor-authoring-map.json",
+  "memory.md",
+  "scripts"
+]);
+
+function isInside(parent, child) {
+  const path = relative(parent, child);
+  return path === "" || (!path.startsWith(`..${sep}`) && path !== "..");
+}
+
+function shouldExport(relativePath, entryPath) {
+  if (relativePath === entryPath) return true;
+  const [rootName] = relativePath.split(sep);
+  if (PLAYABLE_EXPORT_EXCLUDES.has(rootName) || rootName.startsWith(".")) return false;
+  return !relativePath.endsWith(".project.json");
+}
+
+async function listPlayableFiles(root, entryPath) {
+  const files = [];
+  async function visit(directory) {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+      const absolutePath = resolve(directory, entry.name);
+      const relativePath = relative(root, absolutePath);
+      if (!shouldExport(relativePath, entryPath)) continue;
+      if (entry.isSymbolicLink()) throw new Error(`Playable exports reject symlinks: ${relativePath}`);
+      if (entry.isDirectory()) {
+        await visit(absolutePath);
+      } else if (entry.isFile()) {
+        const bytes = await readFile(absolutePath);
+        files.push({
+          absolutePath,
+          relativePath,
+          bytes: bytes.byteLength,
+          hash: createHash("sha256").update(bytes).digest("hex")
+        });
+      }
+    }
+  }
+  await visit(root);
+  return files;
+}
+
+async function planPlayableExport(state, inputProjectPath, outputDirectory) {
+  if (!state.project.playable) throw new Error("Project does not declare a playable runtime.");
+  if (!outputDirectory) throw new Error("playable-export requires --param output_dir=<directory>.");
+  const sourceRoot = dirname(inputProjectPath);
+  const outputRoot = resolve(String(outputDirectory));
+  if (isInside(sourceRoot, outputRoot) || isInside(outputRoot, sourceRoot)) {
+    throw new Error("Playable export output must be outside the source project tree.");
+  }
+  const entryPath = state.project.playable.entry.split(/[?#]/, 1)[0].replace(/^\.\//, "");
+  const sourceEntry = resolve(sourceRoot, entryPath);
+  if (!isInside(sourceRoot, sourceEntry)) throw new Error("Playable entry escapes the source project tree.");
+  const entryStats = await stat(sourceEntry);
+  if (!entryStats.isFile()) throw new Error(`Playable entry is not a file: ${entryPath}`);
+  const files = await listPlayableFiles(sourceRoot, entryPath);
+  if (!files.some((file) => file.relativePath === entryPath)) throw new Error(`Playable entry was excluded from export: ${entryPath}`);
+  const projectBytes = await readFile(inputProjectPath);
+  const contentHash = createHash("sha256");
+  for (const file of files) contentHash.update(`${file.relativePath}\0${file.hash}\n`);
+  return {
+    schema: "nexusengine.playable-export/1",
+    sourceRoot,
+    outputRoot,
+    entry: entryPath,
+    title: state.project.playable.title,
+    playableId: state.project.playable.id,
+    runtime: state.project.playable.runtime,
+    contractHash: state.project.playable.contractHash,
+    projectHash: createHash("sha256").update(projectBytes).digest("hex"),
+    contentHash: contentHash.digest("hex"),
+    files,
+    bytes: files.reduce((sum, file) => sum + file.bytes, 0)
+  };
+}
+
+function summarizePlayableExport(plan) {
+  return {
+    schema: plan.schema,
+    path: plan.outputRoot,
+    entry: plan.entry,
+    title: plan.title,
+    playableId: plan.playableId,
+    runtime: plan.runtime,
+    contractHash: plan.contractHash,
+    projectHash: plan.projectHash,
+    contentHash: plan.contentHash,
+    fileCount: plan.files.length,
+    bytes: plan.bytes,
+    written: false
+  };
+}
+
+async function writePlayableExport(plan) {
+  try {
+    const existing = await lstat(plan.outputRoot);
+    if (!existing.isDirectory()) throw new Error("Playable export output exists and is not a directory.");
+    if ((await readdir(plan.outputRoot)).length) throw new Error("Playable export output directory must be empty.");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  await mkdir(plan.outputRoot, { recursive: true });
+  for (const file of plan.files) {
+    const outputFile = resolve(plan.outputRoot, file.relativePath);
+    if (!isInside(plan.outputRoot, outputFile)) throw new Error(`Export file escapes output root: ${file.relativePath}`);
+    await mkdir(dirname(outputFile), { recursive: true });
+    await copyFile(file.absolutePath, outputFile);
+  }
+  const receipt = { ...summarizePlayableExport(plan), written: true };
+  await writeFile(resolve(plan.outputRoot, "nexus-playable-export.json"), `${JSON.stringify(receipt, null, 2)}\n`);
+  return receipt;
 }
 
 function applyTemplate(state, templateId, count) {
@@ -244,6 +382,7 @@ function createReport(state, extra = {}) {
     ok: sequenceGraph.ok,
     title: state.project.title,
     domainPath: state.project.domainPath,
+    playable: state.project.playable ?? null,
     objectCount: stats.objectCount,
     kitCount: state.project.domainStack.length,
     kitMutationMode: state.editorRuntime.kitMutationMode,
