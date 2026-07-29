@@ -7,10 +7,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { createRealtimeGame } from "nexusengine";
 import {
-  createMcpDomainKit,
+  createMcpRegistryKit,
   defineMcpProvider
-} from "@luminarylabs/nexusengine-kits/mcp-domain-kit";
-import { connectMcpStdio } from "@luminarylabs/nexusengine-kits/mcp/node";
+} from "nexusengine/core-domains/core-mcp-domain";
+import { connectMcpStdio } from "nexusengine/core-domains/core-mcp-domain/node";
 import { chromium } from "playwright";
 
 const DEFAULT_URL = "http://127.0.0.1:4174/?run=small-game-loop-2";
@@ -569,11 +569,11 @@ const editorProvider = defineMcpProvider({
 
 const mcpEngine = createRealtimeGame({
   coreKits: false,
-  kits: [createMcpDomainKit({ providers: [editorProvider] })]
+  kits: [createMcpRegistryKit({ providers: [editorProvider] })]
 });
 
 await connectMcpStdio({
-  mcp: mcpEngine.n.mcp,
+  mcp: mcpEngine.n.coreMcp,
   name: "nexusengine-editor",
   version: "0.2.0",
   instructions: "Read nexus-editor://capabilities before calling tools. File-writing tools require NEXUS_EDITOR_MCP_ALLOW_WRITES=1.",

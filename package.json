@@ -18,10 +18,9 @@
     "test": "npm run smoke:intent && npm run build && npm run smoke:playwright"
   },
   "devDependencies": {
-    "@luminarylabs/nexusengine-kits": "github:LuminaryLabs-Dev/NexusEngine-Kits#770137b",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "playwright": "^1.61.1",
-    "zod": "^4.4.3"
+    "nexusengine": "github:LuminaryLabs-Dev/NexusEngine#main",
+    "playwright": "^1.61.1"
   },
   "overrides": {
     "@hono/node-server": "2.0.11"
