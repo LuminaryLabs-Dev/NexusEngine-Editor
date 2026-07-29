@@ -12,7 +12,8 @@ Build NexusEngine Editor as a registry-driven Domain/Kit Composer over NexusEngi
 - Play uses a separate disposable instance and stops before Apply.
 - The 3D viewport remains the primary first-screen surface; advanced registry details stay folded.
 - The complete Editor remains inside the window at wide, compact, and narrow sizes; persistent work regions never overlay and all capabilities remain reachable through bounded grid regions.
-- Local sibling-Engine integration passes intent and Playwright human-view checks without changing the production `0.0.3` CDN pin.
+- Clean installed NexusEngine `0.0.4` integration passes intent, MCP restart, and Playwright human-view checks without changing the production `0.0.3` CDN pin.
+- MCP can discover Domains and Kits, produce a stable plan, require human approval for Apply, persist exactly one receipt, and replay that receipt after restart without mutation.
 
 ## Boundaries
 

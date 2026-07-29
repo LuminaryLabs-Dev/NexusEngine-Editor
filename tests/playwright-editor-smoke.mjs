@@ -6,7 +6,6 @@ import { extname, resolve } from "node:path";
 import { chromium } from "playwright";
 
 const editorRoot = resolve(process.cwd());
-const githubRoot = resolve(editorRoot, "..");
 const executablePath = existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined;
 const mime = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 const playableFixture = {
@@ -57,8 +56,8 @@ const server = createServer(async (request, response) => {
       response.end("<!doctype html><title>Playable Fixture Runtime</title><main>PLAYABLE FIXTURE READY</main><script>window.__NEXUS_GAME_PROOF__={version:1,snapshot(){return {lifecycle:'title'}},command(){return {ok:true}}}</script>");
       return;
     }
-    let filePath = resolve(githubRoot, `.${pathname}`);
-    if (!filePath.startsWith(githubRoot)) throw new Error("Path escapes test root.");
+    let filePath = resolve(editorRoot, `.${pathname}`);
+    if (!filePath.startsWith(editorRoot)) throw new Error("Path escapes test root.");
     if ((await stat(filePath)).isDirectory()) filePath = resolve(filePath, "index.html");
     const body = await readFile(filePath);
     response.writeHead(200, { "content-type": `${mime[extname(filePath)] ?? "application/octet-stream"}; charset=utf-8`, "cache-control": "no-store" });
@@ -70,7 +69,7 @@ const server = createServer(async (request, response) => {
 });
 await new Promise((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
 const address = server.address();
-const url = `http://127.0.0.1:${address.port}/NexusEngine-Editor/index.html?engine=/NexusEngine/src/index.js`;
+const url = `http://127.0.0.1:${address.port}/index.html?engine=/node_modules/nexusengine/src/index.js`;
 
 const browser = await chromium.launch({ headless: true, executablePath, args: ["--no-sandbox"] });
 const consoleErrors = [];
@@ -170,7 +169,7 @@ try {
   assert.equal(initial.version, "0.3.0");
   assert.equal(initial.schema, "nexusengine.composition-tree/1");
   assert.equal(initial.valid, true);
-  assert.match(initial.source, /NexusEngine\/src\/index\.js/);
+  assert.match(initial.source, /node_modules\/nexusengine\/src\/index\.js/);
   assert.ok(initial.nodeCount >= 15);
 
   const viewportLayout = await page.evaluate(() => {
@@ -369,6 +368,7 @@ try {
   assert.equal(await playablePage.locator("#viewport-authoring-view option").count(), 2, "generated project exposes authored world and player views");
   assert.equal(await playablePage.locator(".default-cube, .camera-frustum, .transform-gizmo").count(), 0, "generated spatial maps do not receive legacy screen-space geometry proxies");
   await playablePage.locator("#viewport-authoring-view").selectOption("player-spawn");
+  await playablePage.waitForFunction(() => Boolean(window.__NEXUS_VIEWPORT_RENDERER__?.camera));
   const playerCamera = await playablePage.evaluate(() => window.__NEXUS_VIEWPORT_RENDERER__.camera);
   assert.deepEqual(playerCamera.position, { x: 0, y: 1.72, z: 4 });
   assert.deepEqual(playerCamera.target, { x: 0, y: 1.72, z: -4 });

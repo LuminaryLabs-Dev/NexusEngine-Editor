@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "nexusengine": "github:LuminaryLabs-Dev/NexusEngine#main",
+    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#91ebeeebb4f4f9bb121d13e0a97b6eac849ae485",
     "playwright": "^1.61.1"
   },
   "overrides": {

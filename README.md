@@ -61,11 +61,14 @@ Code and registry-package installation is intentionally CLI-only. Browser runtim
 `playable-export` is the exact-game export path for projects carrying `nexusengine.playable-project/1`. It copies the local runtime into a new or empty standalone folder, rejects symlinks and source/output nesting, omits authoring evidence and project-only files, and writes `nexus-playable-export.json` with project, contract, and content fingerprints. Manifest-only templates continue using the single-file DSK HTML builder.
 
 `npm run mcp:screenshot` starts a standards-compliant stdio MCP server through
-the optional NexusEngine Core MCP domain. Captures are written under
-`.agent/screenshots/`. File-writing tools fail closed unless
-`NEXUS_EDITOR_MCP_ALLOW_WRITES=1` is present in the server process.
+the optional NexusEngine Core MCP domain. The Node CLI/MCP dependency is pinned
+to the exact NexusEngine `0.0.4` commit in `package-lock.json`; the browser CDN
+remains on the static `0.0.3` fallback described above. Captures are written
+under `.agent/screenshots/`. File-writing tools and `composition_apply` fail
+closed unless `NEXUS_EDITOR_MCP_ALLOW_WRITES=1` is present in the server
+process.
 
-Screenshot MCP tools:
+Editor MCP tools:
 
 - `editor_project_status` - load a project through the authoritative CLI and return the accepted normalized state.
 - `editor_playable_export` - run the authoritative exact-game export, launch it from a disposable local server, and return title-state screenshot proof.
@@ -74,6 +77,18 @@ Screenshot MCP tools:
 - `editor_click_screenshot` - open a URL, click a selector or coordinate, then capture status plus screenshot.
 - `editor_human_view_diagnostic` - screenshot-backed checks for viewport visibility, docked panels, CLI-only kit install, and loaded manifest.
 - `editor_cli_game_screenshot` - run a CLI game/template operation, open the generated HTML, optionally click it, and return screenshot-backed status.
+- `domains_list`, `domain_get`, `kits_list`, and `kit_explain` - inspect the trusted Engine/Editor registry without mutation.
+- `composition_plan` - produce a stable, dependency-ordered composition plan.
+- `composition_apply` - after explicit approval, validate and atomically replace the accepted Editor composition.
+
+Composition MCP state defaults to
+`.agent/mcp-output/editor-composition.project.json`; set
+`NEXUS_EDITOR_MCP_PROJECT=/path/to/project.json` to select another project.
+Apply receipts and Kit fingerprints are stored in the project. Repeating the
+same plan, including after restarting the MCP process, returns the original
+receipt without reinstalling. A changed executable behind an existing Kit ID
+fails before project mutation. Receipts are readable at
+`nexus-composition://receipts`.
 
 `npm run mcp:game` is a separate opted-in game runtime proof. It installs the
 Core MCP registry Kit and exposes only `game_status`, `game_step`,

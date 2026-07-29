@@ -28,18 +28,34 @@ function inferSchema(value = {}) {
   return { type: "object", properties, additionalProperties: true };
 }
 
-function closestParentPath(path, paths) {
-  const candidates = [...paths].filter((candidate) => candidate !== path && path.startsWith(`${candidate}:`));
-  return candidates.sort((left, right) => right.length - left.length)[0] ?? null;
+function immediateParentPath(path) {
+  const separator = String(path).lastIndexOf(":");
+  return separator <= 1 ? null : String(path).slice(0, separator);
+}
+
+function pathHierarchy(paths) {
+  const result = new Set();
+  for (const path of paths) {
+    let current = String(path);
+    while (current) {
+      result.add(current);
+      current = immediateParentPath(current);
+    }
+  }
+  return [...result].sort((left, right) => {
+    const depth = left.split(":").length - right.split(":").length;
+    return depth || left.localeCompare(right);
+  });
 }
 
 export function createProjectRegistryOverlay(project) {
   const sourceId = `project:${slug(project.domainPath ?? project.title)}`;
   const rows = asList(project.domainStack);
-  const paths = new Set(rows.map((row) => String(row.domainPath)).filter(Boolean));
+  const rowsByPath = new Map(rows.filter((row) => row?.domainPath).map((row) => [String(row.domainPath), row]));
+  const paths = pathHierarchy(rowsByPath.keys());
   const domains = [{
     id: "project-root-domain",
-    domainPath: project.domainPath ?? "n:game:project",
+    domainPath: "n:project",
     parentDomainPath: null,
     label: project.title ?? "Game Root",
     status: "project-local",
@@ -53,23 +69,27 @@ export function createProjectRegistryOverlay(project) {
   const usedIds = new Set(["project-root-domain"]);
   const domainIdByPath = new Map();
   const kitIdByPath = new Map();
-  for (const row of rows) {
-    if (!row?.domainPath || domainIdByPath.has(row.domainPath)) continue;
-    let id = `project-domain-${slug(row.domainPath)}`;
+  for (const domainPath of paths) {
+    const row = rowsByPath.get(domainPath);
+    let id = `project-domain-${slug(domainPath)}`;
     while (usedIds.has(id)) id = `${id}-local`;
     usedIds.add(id);
-    domainIdByPath.set(row.domainPath, id);
+    domainIdByPath.set(domainPath, id);
     domains.push({
       id,
-      domainPath: row.domainPath,
-      parentDomainPath: closestParentPath(row.domainPath, paths),
-      label: row.label ?? row.domainPath,
-      status: row.status ?? "project-local",
-      ownedMeaning: [row.subtitle ?? `Project-local meaning bounded by ${row.domainPath}.`],
+      domainPath,
+      parentDomainPath: immediateParentPath(domainPath),
+      label: row?.label ?? domainPath.split(":").at(-1),
+      status: row?.status ?? "project-local",
+      ownedMeaning: [row?.subtitle ?? `Project-local meaning bounded by ${domainPath}.`],
       forbiddenResponsibilities: ["browser lifecycle", "renderer implementation", "GPU device ownership"],
-      settingsSchema: inferSchema(project.kitConfigs?.[row.domainPath] ?? {}),
+      settingsSchema: inferSchema(project.kitConfigs?.[domainPath] ?? {}),
       sourceRegistryId: sourceId,
-      metadata: { projectLocal: true, legacyId: row.id ?? null }
+      metadata: {
+        projectLocal: true,
+        syntheticParent: !row,
+        legacyId: row?.id ?? null
+      }
     });
   }
   for (const row of rows) {
@@ -86,7 +106,7 @@ export function createProjectRegistryOverlay(project) {
       kind: row.type ?? "domain-service-kit",
       domain: row.domain ?? slug(row.domainPath),
       domainPath: row.domainPath,
-      parentDomainPath: closestParentPath(row.domainPath, paths),
+      parentDomainPath: immediateParentPath(row.domainPath),
       apiName: null,
       apiVisibility: "public",
       requires: clone(row.requires ?? []),
@@ -326,6 +346,7 @@ function controllerUnavailable(project, reason) {
     remove: () => ({ ok: false, reason }),
     update: () => ({ ok: false, reason }),
     apply: () => ({ ok: false, report }),
+    applyTree: () => ({ ok: false, report }),
     runOnce: async () => ({ ok: false, verdict: "unavailable", error: reason }),
     play: () => ({ ok: false, error: reason }),
     stop: () => ({ ok: true, stopped: false }),
@@ -410,6 +431,21 @@ export function createCompositionController(options = {}) {
     project.previewReceipts = [...asList(project.previewReceipts), clone(receipt)].slice(-20);
     return receipt;
   }
+  function acceptTree(input) {
+    const nextDraft = clone(NexusEngine.normalizeCompositionTree(input));
+    const report = NexusEngine.validateCompositionTree(nextDraft, registry);
+    if (!report.ok) return { ok: false, report: clone(report) };
+    stop();
+    nextDraft.revision = Number(project.composition.revision ?? 0) + 1;
+    nextDraft.registryHash = registry.contentHash;
+    project.composition = NexusEngine.normalizeCompositionTree(nextDraft);
+    draft = clone(project.composition);
+    if (!draft.nodes.some((node) => node.id === selectedNodeId)) selectedNodeId = draft.rootNodeId;
+    dirty = false;
+    refresh();
+    deriveLegacyCompositionProjections(project, registry);
+    return { ok: true, composition: clone(project.composition), report: clone(validation) };
+  }
 
   deriveLegacyCompositionProjections(project, registry);
   return Object.freeze({
@@ -462,16 +498,9 @@ export function createCompositionController(options = {}) {
     },
     resetDraft() { draft = clone(project.composition); selectedNodeId = draft.rootNodeId; dirty = false; refresh(); return clone(draft); },
     apply() {
-      const report = refresh();
-      if (!report.ok) return { ok: false, report: clone(report) };
-      stop();
-      draft.revision = Number(project.composition.revision ?? 0) + 1;
-      draft.registryHash = registry.contentHash;
-      project.composition = NexusEngine.normalizeCompositionTree(draft);
-      draft = clone(project.composition); dirty = false; refresh();
-      deriveLegacyCompositionProjections(project, registry);
-      return { ok: true, composition: clone(project.composition), report: clone(validation) };
+      return acceptTree(draft);
     },
+    applyTree: (tree) => acceptTree(tree),
     async runOnce(scopeNodeId = selectedNodeId) {
       if (dirty) return addReceipt({ id: `preview-${Date.now()}`, at: new Date().toISOString(), scopeNodeId, verdict: "blocked", ok: false, error: "Apply the draft before preview." });
       const plan = NexusEngine.planCompositionTree(project.composition, registry, { scopeNodeId });

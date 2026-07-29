@@ -3,7 +3,9 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import * as NexusEngine from "../../NexusEngine/src/index.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import * as NexusEngine from "nexusengine";
 import { EDITOR_KITS, createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js";
 import { DEFAULT_DSK_GAME, buildDskGameHtml, createDskGameFileName, normalizeDskGameManifest } from "../src/dsk-html-builder.js";
 import { addSequenceStep, appendDomainKit, appendSceneObject, appendSceneObjectGroup, appendScenePreset, buildDomainStackHealth, buildEditorExportManifest, buildSceneObjectStats, createEditorProject, createEditorProjectFileName, deleteSceneObject, duplicateSceneObject, filterDomainStack, filterSceneObjects, listGameAuthoringTemplates, listSceneAuthoringPresets, normalizeBuildRuntimeConfig, listSequenceEventOptions, normalizePlayableProject, normalizeViewportRuntimeConfig, selectSceneObject, updateSceneObjectTransform, updateSequenceStepLink, validateSequenceLinks } from "../src/editor-domain-model.js";
@@ -11,6 +13,23 @@ import { createEditorKitInstallSurface, createEditorRegistrySnapshot, normalizeK
 import { createCompositionController } from "../src/editor-composition.js";
 import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 import { validateEditorFeatureContracts } from "../src/kits/editor-feature-contracts-kit/index.js";
+
+async function connectEditorMcp(projectPath, { allowWrites = false } = {}) {
+  const client = new Client({ name: "nexusengine-editor-intent-smoke", version: "0.1.0" });
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ["scripts/nexus-engine-editor-screenshot-mcp.mjs"],
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NEXUS_EDITOR_MCP_PROJECT: projectPath,
+      NEXUS_EDITOR_MCP_ALLOW_WRITES: allowWrites ? "1" : "0"
+    },
+    stderr: "ignore"
+  });
+  await client.connect(transport);
+  return client;
+}
 
 assert.equal(EDITOR_KITS.length, 14);
 assert.ok(EDITOR_KITS.every((kit) => kit.id.startsWith("editor-") && kit.id.endsWith("-kit")));
@@ -639,6 +658,100 @@ try {
     { title: cliStatus.title, domainPath: cliStatus.domainPath, playable: cliStatus.playable, objectCount: cliStatus.objectCount, kitCount: cliStatus.kitCount, sequenceGraph: cliStatus.sequenceGraph },
     "MCP and CLI expose the same accepted project state"
   );
+
+  const compositionMcpProjectPath = join(playableSource, "composition-mcp.project.json");
+  const compositionRequest = { kits: ["n-core-object-placement-kit"] };
+  const requiredCompositionTools = [
+    "composition_apply",
+    "composition_plan",
+    "domain_get",
+    "domains_list",
+    "kit_explain",
+    "kits_list"
+  ];
+
+  const deniedClient = await connectEditorMcp(compositionMcpProjectPath);
+  const deniedTools = (await deniedClient.listTools()).tools.map((tool) => tool.name);
+  assert.deepEqual(
+    requiredCompositionTools.filter((name) => deniedTools.includes(name)).sort(),
+    requiredCompositionTools,
+    "Editor MCP exposes the complete Composition tool surface"
+  );
+  const deniedPlan = (await deniedClient.callTool({
+    name: "composition_plan",
+    arguments: compositionRequest
+  })).structuredContent;
+  const deniedApply = await deniedClient.callTool({
+    name: "composition_apply",
+    arguments: { ...compositionRequest, expectedPlanId: deniedPlan.planId }
+  });
+  assert.equal(deniedApply.isError, true, "composition_apply requires explicit write approval");
+  assert.match(deniedApply.content[0].text, /explicit authorization/);
+  await deniedClient.close();
+  assert.equal(existsSync(compositionMcpProjectPath), false, "denied apply cannot persist a project");
+
+  const applyClient = await connectEditorMcp(compositionMcpProjectPath, { allowWrites: true });
+  const plan = (await applyClient.callTool({
+    name: "composition_plan",
+    arguments: compositionRequest
+  })).structuredContent;
+  assert.equal(plan.ok, true);
+  assert.deepEqual(plan.kits.map((kit) => kit.kitId), [
+    "n-core-object-kit",
+    "n-core-object-placement-kit"
+  ]);
+  const firstApply = (await applyClient.callTool({
+    name: "composition_apply",
+    arguments: { ...compositionRequest, expectedPlanId: plan.planId }
+  })).structuredContent;
+  const repeatedApply = (await applyClient.callTool({
+    name: "composition_apply",
+    arguments: { ...compositionRequest, expectedPlanId: plan.planId }
+  })).structuredContent;
+  assert.deepEqual(repeatedApply, firstApply, "same-process replay returns the original receipt");
+  await applyClient.close();
+
+  const restartedClient = await connectEditorMcp(compositionMcpProjectPath, { allowWrites: true });
+  const restartedPlan = (await restartedClient.callTool({
+    name: "composition_plan",
+    arguments: compositionRequest
+  })).structuredContent;
+  assert.equal(restartedPlan.planId, plan.planId, "the same request keeps its stable plan id after restart");
+  const restartedApply = (await restartedClient.callTool({
+    name: "composition_apply",
+    arguments: { ...compositionRequest, expectedPlanId: restartedPlan.planId }
+  })).structuredContent;
+  assert.deepEqual(restartedApply, firstApply, "restart replay returns the persisted original receipt");
+  const receiptResource = JSON.parse((await restartedClient.readResource({
+    uri: "nexus-composition://receipts"
+  })).contents[0].text);
+  assert.equal(receiptResource.receipts.length, 1);
+  await restartedClient.close();
+
+  const persistedComposition = JSON.parse(readFileSync(compositionMcpProjectPath, "utf8"));
+  assert.equal(persistedComposition.project.compositionApplyState.receipts.length, 1);
+  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "n-core-object-kit"));
+  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "n-core-object-placement-kit"));
+  const disconnectedController = createCompositionController({
+    project: persistedComposition.project,
+    NexusEngine,
+    registryImports: [createEditorRegistrySnapshot()],
+    globalObject: globalThis
+  });
+  const placementDomainNode = persistedComposition.project.composition.nodes
+    .find((node) => node.registryId === "domain-object-placement");
+  const disconnectedPlay = disconnectedController.play(placementDomainNode.id);
+  assert.equal(disconnectedPlay.ok, true, disconnectedPlay.error);
+  assert.deepEqual(disconnectedPlay.installOrder, [
+    "n-core-object-kit",
+    "n-core-object-placement-kit"
+  ]);
+  assert.deepEqual(disconnectedController.stop(), {
+    ok: true,
+    stopped: true,
+    disposed: true,
+    errors: []
+  });
 } finally {
   rmSync(playableExportRoot, { recursive: true, force: true });
 }

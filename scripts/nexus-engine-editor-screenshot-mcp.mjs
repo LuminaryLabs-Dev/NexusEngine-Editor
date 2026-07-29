@@ -1,22 +1,31 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { readFile, stat, mkdir } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { extname, relative, resolve, sep } from "node:path";
+import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { createRealtimeGame } from "nexusengine";
+import * as NexusEngine from "nexusengine";
 import {
   createMcpRegistryKit,
   defineMcpProvider
 } from "nexusengine/core-domains/core-mcp-domain";
 import { connectMcpStdio } from "nexusengine/core-domains/core-mcp-domain/node";
 import { chromium } from "playwright";
+import { createCompositionController } from "../src/editor-composition.js";
+import { createEditorCompositionMcpBridge } from "../src/editor-composition-mcp.js";
+import { createEditorRegistrySnapshot } from "../src/editor-kit-registry.js";
+import { createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js";
+import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 
 const DEFAULT_URL = "http://127.0.0.1:4174/?run=small-game-loop-2";
 const DEFAULT_SCREENSHOT_DIR = ".agent/screenshots";
 const DEFAULT_MCP_OUTPUT_DIR = ".agent/mcp-output";
 const EDITOR_ROOT = resolve(fileURLToPath(new URL("../", import.meta.url)));
+const COMPOSITION_PROJECT_PATH = resolve(
+  process.env.NEXUS_EDITOR_MCP_PROJECT
+  ?? `${DEFAULT_MCP_OUTPUT_DIR}/editor-composition.project.json`
+);
 const execFileAsync = promisify(execFile);
 const CLI_SCREENSHOT_OPERATIONS = new Set(["chess-game", "target-clicker-game", "gem-collector-game", "game-template"]);
 const WRITE_TOOLS = new Set([
@@ -25,7 +34,8 @@ const WRITE_TOOLS = new Set([
   "editor_visual_status",
   "editor_click_screenshot",
   "editor_human_view_diagnostic",
-  "editor_cli_game_screenshot"
+  "editor_cli_game_screenshot",
+  "composition_apply"
 ]);
 
 const TOOLS = Object.freeze([
@@ -543,6 +553,10 @@ const editorProvider = defineMcpProvider({
       writeApproval: {
         environmentVariable: "NEXUS_EDITOR_MCP_ALLOW_WRITES",
         requiredValue: "1"
+      },
+      composition: {
+        providerId: "nexusengine-editor-composition",
+        projectPath: COMPOSITION_PROJECT_PATH
       }
     })
   }],
@@ -567,15 +581,61 @@ const editorProvider = defineMcpProvider({
   }]
 });
 
-const mcpEngine = createRealtimeGame({
+async function persistCompositionProject(state) {
+  const snapshot = state.editorRuntime.getBinding("projectPersistence").createSnapshot();
+  const temporaryPath = `${COMPOSITION_PROJECT_PATH}.${process.pid}.tmp`;
+  await mkdir(dirname(COMPOSITION_PROJECT_PATH), { recursive: true });
+  await writeFile(temporaryPath, `${JSON.stringify(snapshot, null, 2)}\n`, { mode: 0o600 });
+  await rename(temporaryPath, COMPOSITION_PROJECT_PATH);
+}
+
+async function createCompositionContext() {
+  const state = createEditorState();
+  state.editorRuntime = createNexusEngineEditorRuntime({
+    NexusEngine,
+    state,
+    kitMutationMode: "cli",
+    recordEvent: (type, payload) => recordEditorEvent(state, type, payload)
+  });
+  try {
+    state.editorRuntime.getBinding("projectPersistence").importFile(
+      await readFile(COMPOSITION_PROJECT_PATH, "utf8"),
+      COMPOSITION_PROJECT_PATH
+    );
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const controller = createCompositionController({
+    project: state.project,
+    NexusEngine,
+    registryImports: [createEditorRegistrySnapshot()],
+    globalObject: globalThis
+  });
+  if (!controller.supported) throw new Error(controller.reason);
+  return { state, controller };
+}
+
+const compositionContext = await createCompositionContext();
+const mcpEngine = NexusEngine.createRealtimeGame({
   coreKits: false,
-  kits: [createMcpRegistryKit({ providers: [editorProvider] })]
+  kits: [
+    NexusEngine.createCoreCompositionKit({ registry: compositionContext.controller.registry }),
+    createMcpRegistryKit({ providers: [editorProvider] })
+  ]
+});
+createEditorCompositionMcpBridge({
+  NexusEngine,
+  controller: compositionContext.controller,
+  composition: mcpEngine.n.coreComposition,
+  mcp: mcpEngine.n.coreMcp,
+  project: compositionContext.state.project,
+  persistProject: () => persistCompositionProject(compositionContext.state)
 });
 
 await connectMcpStdio({
   mcp: mcpEngine.n.coreMcp,
   name: "nexusengine-editor",
   version: "0.2.0",
-  instructions: "Read nexus-editor://capabilities before calling tools. File-writing tools require NEXUS_EDITOR_MCP_ALLOW_WRITES=1.",
+  instructions: "Read nexus-editor://capabilities before calling tools. composition_apply and file-writing tools require NEXUS_EDITOR_MCP_ALLOW_WRITES=1.",
   authorize: ({ tool }) => !WRITE_TOOLS.has(tool.name) || process.env.NEXUS_EDITOR_MCP_ALLOW_WRITES === "1"
 });
