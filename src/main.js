@@ -96,7 +96,7 @@ function setMode(mode) {
   render();
 }
 
-function playEditor() {
+async function playEditor() {
   state.workspaceUi.projectActionsOpen = false;
   if (state.project.playable) {
     const entry = resolvePlayableEntry();
@@ -114,7 +114,7 @@ function playEditor() {
     render();
     return;
   }
-  const result = state.compositionController?.play?.(state.compositionController?.getSelectedNode?.()?.id ?? state.project.composition?.rootNodeId);
+  const result = await state.compositionController?.play?.(state.compositionController?.getSelectedNode?.()?.id ?? state.project.composition?.rootNodeId);
   if (result?.ok) {
     state.mode = "playing";
     recordEditorEvent(state, "editor.playing", { domainPath: "n:editor:status", mode: "playing", installOrder: result.installOrder });
@@ -1606,7 +1606,7 @@ function render() {
     </main>
   `;
 
-  root.querySelector("#play").addEventListener("click", () => playEditor());
+  root.querySelector("#play").addEventListener("click", () => void playEditor());
   root.querySelector("#stop").addEventListener("click", () => setMode("stopped"));
   root.querySelector("#project-actions-toggle").addEventListener("click", () => toggleProjectActions());
   root.querySelector("#reset-workspace-layout").addEventListener("click", () => resetWorkspaceLayout());

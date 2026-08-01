@@ -5,13 +5,13 @@ import { createServer } from "node:http";
 import { dirname, extname, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import * as NexusEngine from "nexusengine";
 import {
   createMcpRegistryKit,
   defineMcpProvider
-} from "nexusengine/core-domains/core-mcp-domain";
-import { connectMcpStdio } from "nexusengine/core-domains/core-mcp-domain/node";
+} from "nexusengine/domains/mcp";
 import { chromium } from "playwright";
+import { NexusEngine } from "../src/adapters/installed-nexusengine.js";
+import { connectMcpStdio } from "../src/adapters/node-mcp-sdk-adapter.js";
 import { createCompositionController } from "../src/editor-composition.js";
 import { createEditorCompositionMcpBridge } from "../src/editor-composition-mcp.js";
 import { createEditorRegistrySnapshot } from "../src/editor-kit-registry.js";
@@ -616,24 +616,24 @@ async function createCompositionContext() {
 }
 
 const compositionContext = await createCompositionContext();
-const mcpEngine = NexusEngine.createRealtimeGame({
-  coreKits: false,
+const mcpEngine = NexusEngine.createEngine({
+  domainKits: false,
   kits: [
-    NexusEngine.createCoreCompositionKit({ registry: compositionContext.controller.registry }),
+    NexusEngine.createCompositionKit({ registry: compositionContext.controller.registry }),
     createMcpRegistryKit({ providers: [editorProvider] })
   ]
 });
 createEditorCompositionMcpBridge({
   NexusEngine,
   controller: compositionContext.controller,
-  composition: mcpEngine.n.coreComposition,
-  mcp: mcpEngine.n.coreMcp,
+  composition: mcpEngine.n.composition,
+  mcp: mcpEngine.n.mcp,
   project: compositionContext.state.project,
   persistProject: () => persistCompositionProject(compositionContext.state)
 });
 
 await connectMcpStdio({
-  mcp: mcpEngine.n.coreMcp,
+  mcp: mcpEngine.n.mcp,
   name: "nexusengine-editor",
   version: "0.2.0",
   instructions: "Read nexus-editor://capabilities before calling tools. composition_apply and file-writing tools require NEXUS_EDITOR_MCP_ALLOW_WRITES=1.",

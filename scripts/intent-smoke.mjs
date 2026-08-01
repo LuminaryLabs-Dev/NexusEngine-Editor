@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import * as NexusEngine from "nexusengine";
+import { NexusEngine } from "../src/adapters/installed-nexusengine.js";
 import { EDITOR_KITS, createEditorState, recordEditorEvent } from "../src/kits/editor-kits.js";
 import { DEFAULT_DSK_GAME, buildDskGameHtml, createDskGameFileName, normalizeDskGameManifest } from "../src/dsk-html-builder.js";
 import { addSequenceStep, appendDomainKit, appendSceneObject, appendSceneObjectGroup, appendScenePreset, buildDomainStackHealth, buildEditorExportManifest, buildSceneObjectStats, createEditorProject, createEditorProjectFileName, deleteSceneObject, duplicateSceneObject, filterDomainStack, filterSceneObjects, listGameAuthoringTemplates, listSceneAuthoringPresets, normalizeBuildRuntimeConfig, listSequenceEventOptions, normalizePlayableProject, normalizeViewportRuntimeConfig, selectSceneObject, updateSceneObjectTransform, updateSequenceStepLink, validateSequenceLinks } from "../src/editor-domain-model.js";
@@ -141,10 +141,10 @@ assert.equal(state.selectedDomainPath, "n:physics");
 assert.equal(state.project.scene3d.objects[0].label, "Default Cube");
 assert.ok(state.project.domainStack.some((domain) => domain.domainPath === "n:render:three"));
 assert.equal(state.project.sequenceSteps.length, 3);
-assert.equal(state.project.version, "0.3.0");
+assert.equal(state.project.version, "0.4.0");
 assert.equal(state.project.composition.schema, "nexusengine.composition-tree/1");
-assert.equal(state.project.compositionRegistryOverlay.schema, "nexusengine.core-composition.registry/2");
-assert.equal(state.project.compositionRegistryOverlay.sources[0].trusted, false);
+assert.equal(state.project.compositionRegistryOverlay.schema, "nexusengine.composition-registry/3");
+assert.equal(state.project.compositionRegistryOverlay.sources[0].status, "metadata-only");
 assert.ok(state.project.scene3d.objects[0].kitNodeIds.length > 0, "legacy object paths migrate to kit-node ids");
 
 const playableProject = createEditorProject({
@@ -182,44 +182,52 @@ assert.equal(invalidApply.ok, false, "invalid draft cannot replace accepted comp
 assert.equal(JSON.stringify(composition.getAccepted()), acceptedBeforeInvalid, "failed Apply is atomic");
 composition.resetDraft();
 composition.select(compositionProject.composition.rootNodeId);
-const coreDataDomain = composition.listAddOptions("domain").find((entry) => entry.domainPath === "n:core-data");
-assert.ok(coreDataDomain);
-assert.equal(composition.add("domain", coreDataDomain.id).ok, true);
-const coreDataKit = composition.listAddOptions("kit").find((entry) => entry.id === "n-core-data-kit");
-assert.ok(coreDataKit);
-assert.equal(composition.add("kit", coreDataKit.id).ok, true);
+const runtimeDomain = composition.listAddOptions("domain").find((entry) => entry.id === "runtime-domain");
+assert.ok(runtimeDomain);
+assert.equal(composition.add("domain", runtimeDomain.id).ok, true);
+const runtimeLifecycleKit = composition.listAddOptions("kit").find((entry) => entry.id === "runtime-lifecycle-kit");
+assert.ok(runtimeLifecycleKit);
+assert.equal(composition.add("kit", runtimeLifecycleKit.id).ok, true);
+composition.select("domain-runtime-domain-1");
+const runtimeDataDomain = composition.listAddOptions("domain").find((entry) => entry.id === "runtime-data-domain");
+assert.ok(runtimeDataDomain);
+assert.equal(composition.add("domain", runtimeDataDomain.id).ok, true);
+const runtimeDataKit = composition.listAddOptions("kit").find((entry) => entry.id === "runtime-data-kit");
+assert.ok(runtimeDataKit);
+assert.equal(composition.add("kit", runtimeDataKit.id).ok, true);
 assert.equal(composition.apply().ok, true);
 const previewReceipt = await composition.runOnce(composition.getSelectedNode().id);
 assert.equal(previewReceipt.ok, true, previewReceipt.error);
 assert.equal(previewReceipt.disposed, true);
-assert.deepEqual(previewReceipt.installOrder, ["n-core-data-kit"]);
+assert.deepEqual(previewReceipt.installOrder, ["runtime-lifecycle-kit", "runtime-data-kit"]);
 assert.equal(composition.getReceipts().length, 1);
 assert.equal(buildEditorExportManifest(compositionProject).composition.schema, "nexusengine.composition-tree/1");
 
 const probeRegistry = NexusEngine.normalizeRegistrySnapshot({
-  ...NexusEngine.createCoreRegistrySnapshot(),
-  kits: [...NexusEngine.createCoreRegistrySnapshot().kits, {
+  ...NexusEngine.createEngineRegistrySnapshot(),
+  kits: [...NexusEngine.createEngineRegistrySnapshot().kits, {
     id: "n-preview-probe-kit",
     version: "0.0.4",
     status: "stable-candidate",
     kind: "domain-service-kit",
-    domain: "preview-probe",
-    domainPath: "n:core-data",
-    parentDomainPath: null,
+    responsibility: "Exercise an Editor-safe preview command.",
+    domainPath: "n:runtime:data",
+    parentDomainPath: "n:runtime",
     apiName: "previewProbe",
     apiVisibility: "public",
     requires: [],
     provides: ["n:preview-probe"],
     defaults: {},
     settingsSchema: { type: "object", additionalProperties: true },
-    preview: { command: "runEditorPreview", args: { amount: 2 }, timeoutMs: 100, editorSafe: true },
-    source: { registryId: "nexusengine-core", exportName: "createPreviewProbeKit", module: "test", trusted: true }
+    source: { registryId: "nexusengine-core", subpath: "./domains/runtime/data", exportName: "createPreviewProbeKit", environments: ["node"], permissions: [], installable: true },
+    metadata: { preview: { command: "runEditorPreview", args: { amount: 2 }, timeoutMs: 100, editorSafe: true } }
   }]
-}, { allowTrustedSources: true });
+}, { allowBuiltinSources: true });
 const ProbeNexusEngine = {
   ...NexusEngine,
-  createCoreRegistrySnapshot: () => probeRegistry,
-  createPreviewProbeKit: () => NexusEngine.defineRuntimeKit({
+  createEngineRegistrySnapshot: () => probeRegistry,
+  resolveRegistryFactory: async (source) => source.exportName === "createPreviewProbeKit"
+    ? () => NexusEngine.defineRuntimeKit({
     id: "n-preview-probe-kit",
     provides: ["n:preview-probe"],
     install({ engine }) {
@@ -230,12 +238,16 @@ const ProbeNexusEngine = {
         getSnapshot() { return { count }; }
       };
     }
-  })
+      })
+    : NexusEngine.resolveRegistryFactory(source)
 };
 const commandProject = createEditorState().project;
 const commandComposition = createCompositionController({ project: commandProject, NexusEngine: ProbeNexusEngine, registryImports: [createEditorRegistrySnapshot()], globalObject: globalThis });
 commandComposition.select(commandProject.composition.rootNodeId);
-assert.equal(commandComposition.add("domain", "domain-core-data").ok, true);
+assert.equal(commandComposition.add("domain", "runtime-domain").ok, true);
+assert.equal(commandComposition.add("kit", "runtime-lifecycle-kit").ok, true);
+commandComposition.select("domain-runtime-domain-1");
+assert.equal(commandComposition.add("domain", "runtime-data-domain").ok, true);
 assert.equal(commandComposition.add("kit", "n-preview-probe-kit").ok, true);
 assert.equal(commandComposition.apply().ok, true);
 const commandReceipt = await commandComposition.runOnce(commandComposition.getSelectedNode().id);
@@ -660,21 +672,27 @@ try {
   );
 
   const compositionMcpProjectPath = join(playableSource, "composition-mcp.project.json");
-  const compositionRequest = { kits: ["n-core-object-placement-kit"] };
+  const compositionRequest = { kits: ["object-placement-kit"] };
   const requiredCompositionTools = [
     "composition_apply",
     "composition_plan",
+    "composition_validate",
+    "atom_get",
+    "atoms_list",
     "domain_get",
     "domains_list",
     "kit_explain",
-    "kits_list"
+    "kits_list",
+    "recipe_get",
+    "recipes_list",
+    "registry_sources_list"
   ];
 
   const deniedClient = await connectEditorMcp(compositionMcpProjectPath);
   const deniedTools = (await deniedClient.listTools()).tools.map((tool) => tool.name);
   assert.deepEqual(
     requiredCompositionTools.filter((name) => deniedTools.includes(name)).sort(),
-    requiredCompositionTools,
+    requiredCompositionTools.slice().sort(),
     "Editor MCP exposes the complete Composition tool surface"
   );
   const deniedPlan = (await deniedClient.callTool({
@@ -697,8 +715,8 @@ try {
   })).structuredContent;
   assert.equal(plan.ok, true);
   assert.deepEqual(plan.kits.map((kit) => kit.kitId), [
-    "n-core-object-kit",
-    "n-core-object-placement-kit"
+    "object-registry-kit",
+    "object-placement-kit"
   ]);
   const firstApply = (await applyClient.callTool({
     name: "composition_apply",
@@ -730,8 +748,8 @@ try {
 
   const persistedComposition = JSON.parse(readFileSync(compositionMcpProjectPath, "utf8"));
   assert.equal(persistedComposition.project.compositionApplyState.receipts.length, 1);
-  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "n-core-object-kit"));
-  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "n-core-object-placement-kit"));
+  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "object-registry-kit"));
+  assert.ok(persistedComposition.project.composition.nodes.some((node) => node.registryId === "object-placement-kit"));
   const disconnectedController = createCompositionController({
     project: persistedComposition.project,
     NexusEngine,
@@ -739,12 +757,12 @@ try {
     globalObject: globalThis
   });
   const placementDomainNode = persistedComposition.project.composition.nodes
-    .find((node) => node.registryId === "domain-object-placement");
-  const disconnectedPlay = disconnectedController.play(placementDomainNode.id);
+    .find((node) => node.registryId === "object-placement-domain");
+  const disconnectedPlay = await disconnectedController.play(placementDomainNode.id);
   assert.equal(disconnectedPlay.ok, true, disconnectedPlay.error);
   assert.deepEqual(disconnectedPlay.installOrder, [
-    "n-core-object-kit",
-    "n-core-object-placement-kit"
+    "object-registry-kit",
+    "object-placement-kit"
   ]);
   assert.deepEqual(disconnectedController.stop(), {
     ok: true,

@@ -8,7 +8,7 @@ The 3D scene viewport is primary. The editor uses a tiered, non-overlay workspac
 - Inspector - right region on wide windows and the Inspector context on compact windows; edit the selected domain, kit, object, or sequence step.
 - Behaviors & Automation - collapsed bottom region on wide windows and the Behaviors context on compact windows; link and run manifest-driven sequences with retained receipts.
 
-Project format `0.3.0` stores an accepted `nexusengine.composition-tree/1` plus a project-local registry overlay. Flat `domainStack`, `kitConfigs`, and object `domainKits` are derived compatibility projections, so existing templates, CLI commands, snapshots, and single-file HTML exports continue to work.
+Project format `0.4.0` stores an accepted `nexusengine.composition-tree/1` plus a metadata-only `nexusengine.composition-registry/3` project overlay. Flat authoring views are derived from that accepted tree for templates, CLI commands, snapshots, and single-file HTML exports.
 
 Composer behavior:
 
@@ -19,19 +19,19 @@ Composer behavior:
 - Imported manifest-only kits never execute URLs or arbitrary methods; they report `Preview unavailable: no trusted provider`.
 - Referenced nodes and nonempty domains cannot be removed silently.
 
-The editor loads NexusEngine `0.0.3` from jsDelivr by default:
+The editor targets the exact committed NexusEngine `0.0.4` source through jsDelivr:
 
 ```txt
-https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@0.0.3/src/index.js
+https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@a68544434424438491be1398e3f3d5aced5bc5ee/src/index.js
 ```
 
-The `0.0.3` CDN build does not expose composition-tree APIs, so the deployed editor reports that composition support is unavailable instead of duplicating the Engine planner. Local integration tests may inject the sibling checkout from the same localhost origin:
+The runtime root and Composition semantic subpath are loaded separately. Factory resolution reads the package export map and imports only the exact canonical subpath recorded in the approved registry. Until the commit is pushed, the CDN request fails closed; local proof injects the packed Engine artifact from the same localhost origin:
 
 ```txt
-http://127.0.0.1:<port>/NexusEngine-Editor/index.html?engine=/NexusEngine/src/index.js
+http://127.0.0.1:<port>/index.html?engine=/node_modules/nexusengine/src/index.js
 ```
 
-Required editor features remain mapped through `editor-feature-contracts-kit`, which records the owning local editor kit, reused ProtoKit/Core source, required tokens, and provided tokens for each feature in exported manifests.
+Required editor features remain mapped through `editor-feature-contracts-kit`, which records the owning local Editor Kit, current Engine/Kits source, required tokens, and provided tokens for each feature in exported manifests.
 
 The same model/runtime can be driven from the terminal through the NexusGameKit-Link-style CLI:
 
@@ -61,9 +61,9 @@ Code and registry-package installation is intentionally CLI-only. Browser runtim
 `playable-export` is the exact-game export path for projects carrying `nexusengine.playable-project/1`. It copies the local runtime into a new or empty standalone folder, rejects symlinks and source/output nesting, omits authoring evidence and project-only files, and writes `nexus-playable-export.json` with project, contract, and content fingerprints. Manifest-only templates continue using the single-file DSK HTML builder.
 
 `npm run mcp:screenshot` starts a standards-compliant stdio MCP server through
-the optional NexusEngine Core MCP domain. The Node CLI/MCP dependency is pinned
-to the exact NexusEngine `0.0.4` commit in `package-lock.json`; the browser CDN
-remains on the static `0.0.3` fallback described above. Captures are written
+the optional NexusEngine MCP Domain and the Editor-owned Node SDK adapter. The
+Engine dependency and tested artifact hashes are pinned in `package.json` and
+`package-lock.json`. Captures are written
 under `.agent/screenshots/`. File-writing tools and `composition_apply` fail
 closed unless `NEXUS_EDITOR_MCP_ALLOW_WRITES=1` is present in the server
 process.
@@ -77,8 +77,9 @@ Editor MCP tools:
 - `editor_click_screenshot` - open a URL, click a selector or coordinate, then capture status plus screenshot.
 - `editor_human_view_diagnostic` - screenshot-backed checks for viewport visibility, docked panels, CLI-only kit install, and loaded manifest.
 - `editor_cli_game_screenshot` - run a CLI game/template operation, open the generated HTML, optionally click it, and return screenshot-backed status.
-- `domains_list`, `domain_get`, `kits_list`, and `kit_explain` - inspect the trusted Engine/Editor registry without mutation.
-- `composition_plan` - produce a stable, dependency-ordered composition plan.
+- `domains_list`, `domain_get`, `kits_list`, `kit_explain`, `atoms_list`, and `atom_get` - inspect relevant semantic ownership and atomic capabilities without mutation.
+- `recipes_list`, `recipe_get`, and `registry_sources_list` - inspect reconstruction recipes and immutable execution sources.
+- `composition_validate` and `composition_plan` - validate a request and produce a stable, dependency-ordered plan.
 - `composition_apply` - after explicit approval, validate and atomically replace the accepted Editor composition.
 
 Composition MCP state defaults to

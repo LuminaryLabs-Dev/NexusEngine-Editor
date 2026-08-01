@@ -166,7 +166,7 @@ try {
     source: window.__NEXUS_COMPOSITION__.source,
     nodeCount: window.__NEXUS_COMPOSITION__.tree.nodes.length
   }));
-  assert.equal(initial.version, "0.3.0");
+  assert.equal(initial.version, "0.4.0");
   assert.equal(initial.schema, "nexusengine.composition-tree/1");
   assert.equal(initial.valid, true);
   assert.match(initial.source, /node_modules\/nexusengine\/src\/index\.js/);
@@ -285,17 +285,28 @@ try {
   assert.equal(addRegionLayout.position, "static", "Add System expands inline");
   assert.equal(addRegionLayout.inside, true, "Add System remains inside Game Structure");
   await page.screenshot({ path: resolve(editorRoot, "dist", "registry-composer-add-inline.png"), fullPage: true });
-  await page.selectOption("#composition-add-select", "domain-core-data");
+  await page.selectOption("#composition-add-select", "runtime-domain");
   await page.click("#composition-add-confirm");
-  await assert.doesNotReject(() => page.locator('[data-composition-node^="domain-domain-core-data"].selected').waitFor());
+  await assert.doesNotReject(() => page.locator('[data-composition-node^="domain-runtime-domain"].selected').waitFor());
+  await page.click("#composition-add-toggle");
+  await page.click('[data-add-kind="kit"]');
+  await page.selectOption("#composition-add-select", "runtime-lifecycle-kit");
+  await page.click("#composition-add-confirm");
+  await assert.doesNotReject(() => page.locator('[data-composition-node^="kit-runtime-lifecycle-kit"].selected').waitFor());
+  await page.click('[data-composition-node^="domain-runtime-domain"]');
+  await page.click("#composition-add-toggle");
+  await page.click('[data-add-kind="domain"]');
+  await page.selectOption("#composition-add-select", "runtime-data-domain");
+  await page.click("#composition-add-confirm");
+  await assert.doesNotReject(() => page.locator('[data-composition-node^="domain-runtime-data-domain"].selected').waitFor());
   await assert.doesNotReject(() => page.locator(".composition-boundary", { hasText: "What this area owns" }).waitFor());
   await assert.doesNotReject(() => page.locator(".composition-settings", { hasText: "Domain Settings" }).waitFor());
   await page.screenshot({ path: resolve(editorRoot, "dist", "registry-composer-domain-inspector.png"), fullPage: true });
   await page.click("#composition-add-toggle");
   await page.click('[data-add-kind="kit"]');
-  await page.selectOption("#composition-add-select", "n-core-data-kit");
+  await page.selectOption("#composition-add-select", "runtime-data-kit");
   await page.click("#composition-add-confirm");
-  await assert.doesNotReject(() => page.locator('[data-composition-node^="kit-n-core-data-kit"].selected').waitFor());
+  await assert.doesNotReject(() => page.locator('[data-composition-node^="kit-runtime-data-kit"].selected').waitFor());
   assert.equal(await page.locator("#composition-run-once").isDisabled(), true, "dirty drafts disable preview");
   assert.equal(await page.locator("#play").isDisabled(), true, "dirty drafts disable Play");
   assert.equal(await page.locator("#build").isDisabled(), true, "dirty drafts disable Build");
@@ -307,7 +318,7 @@ try {
   const passedReceipt = await page.evaluate(() => window.__NEXUS_COMPOSITION__.receipts.at(-1));
   assert.equal(passedReceipt.ok, true);
   assert.equal(passedReceipt.disposed, true);
-  assert.deepEqual(passedReceipt.installOrder, ["n-core-data-kit"]);
+  assert.deepEqual(passedReceipt.installOrder, ["runtime-lifecycle-kit", "runtime-data-kit"]);
   await assert.doesNotReject(() => page.locator(".preview-receipt.ok", { hasText: "passed" }).waitFor());
   await page.locator(".preview-receipt.ok").scrollIntoViewIfNeeded();
   await page.screenshot({ path: resolve(editorRoot, "dist", "registry-composer-preview.png"), fullPage: true });
@@ -334,7 +345,7 @@ try {
   assert.match(await page.locator(".composition-message").textContent(), /no trusted provider/i);
 
   // Save and load preserve accepted composition, while replacing later accepted edits.
-  await page.click('[data-composition-node^="kit-n-core-data-kit"]');
+  await page.click('[data-composition-node^="kit-runtime-data-kit"]');
   await page.fill("#composition-node-label", "Data Preview");
   await page.locator("#composition-node-label").dispatchEvent("change");
   await page.click("#composition-apply");
@@ -347,7 +358,7 @@ try {
   await page.click("#project-actions-toggle");
   await page.click("#load");
   await assert.doesNotReject(() => page.locator(".status-pill", { hasText: "Loaded" }).waitFor());
-  const loadedLabel = await page.evaluate(() => window.__NEXUS_EDITOR_STATE__.project.composition.nodes.find((node) => node.registryId === "n-core-data-kit")?.labelOverride);
+  const loadedLabel = await page.evaluate(() => window.__NEXUS_EDITOR_STATE__.project.composition.nodes.find((node) => node.registryId === "runtime-data-kit")?.labelOverride);
   assert.equal(loadedLabel, "Data Preview");
 
   await page.click("#project-actions-toggle");
@@ -355,9 +366,9 @@ try {
   await page.waitForFunction(() => window.__NEXUS_EDITOR_STATE__.build.status === "ready");
   const built = await page.evaluate(() => ({ html: window.__NEXUS_EDITOR_STATE__.build.html, manifest: JSON.parse(document.querySelector("#project-manifest").textContent) }));
   assert.match(built.html, /runtime-canvas/);
-  assert.equal(built.manifest.version, "0.3.0");
+  assert.equal(built.manifest.version, "0.4.0");
   assert.equal(built.manifest.composition.schema, "nexusengine.composition-tree/1");
-  assert.ok(built.manifest.domainStack.some((entry) => entry.kitId === "n-core-data-kit"), "legacy export projection includes accepted Core kit");
+  assert.ok(built.manifest.domainStack.some((entry) => entry.kitId === "runtime-data-kit"), "legacy export projection includes accepted Core kit");
 
   const playablePage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
   playablePage.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });

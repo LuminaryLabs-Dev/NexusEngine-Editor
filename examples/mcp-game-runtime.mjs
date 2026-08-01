@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
-import { createRealtimeGame } from "nexusengine";
+import { createEngine } from "nexusengine";
 import {
   createMcpRegistryKit,
   defineMcpProvider
-} from "nexusengine/core-domains/core-mcp-domain";
-import { connectMcpStdio } from "nexusengine/core-domains/core-mcp-domain/node";
+} from "nexusengine/domains/mcp";
+import { connectMcpStdio } from "../src/adapters/node-mcp-sdk-adapter.js";
 
 export function createMcpGameRuntime() {
   const state = {
@@ -91,8 +91,8 @@ export function createMcpGameRuntime() {
     }]
   });
 
-  const engine = createRealtimeGame({
-    coreKits: false,
+  const engine = createEngine({
+    domainKits: false,
     kits: [createMcpRegistryKit({ providers: [provider] })]
   });
 
@@ -105,7 +105,7 @@ export function createMcpGameRuntime() {
 export async function runMcpGameStdio() {
   const runtime = createMcpGameRuntime();
   return connectMcpStdio({
-    mcp: runtime.engine.n.coreMcp,
+    mcp: runtime.engine.n.mcp,
     name: "nexusengine-example-game",
     version: "1.0.0",
     instructions: "Read nexus-game://state before acting. game_step requires NEXUS_GAME_MCP_ALLOW_ACTIONS=1.",

@@ -115,18 +115,17 @@ export function createEditorCompositionHost(options = {}) {
   return Object.freeze({
     async preflight({ request, plan, kits }) {
       try {
-        const resolvedKits = kits.map((kit) => {
-          const factory = kit.source?.trusted === true
-            ? NexusEngine[kit.source.exportName]
-            : null;
+        const resolvedKits = [];
+        for (const kit of kits) {
+          const factory = await NexusEngine.resolveRegistryFactory?.(kit.source);
           if (typeof factory !== "function") {
             throw new Error(`Editor has no trusted executable factory for ${kit.kitId}.`);
           }
-          return {
+          resolvedKits.push({
             kitId: kit.kitId,
             executableFingerprint: executableFingerprint(NexusEngine, kit, factory)
-          };
-        });
+          });
+        }
         const tree = request.tree
           ? NexusEngine.normalizeCompositionTree(request.tree)
           : stageEditorCompositionPlan({
@@ -150,6 +149,14 @@ export function createEditorCompositionHost(options = {}) {
       } catch (error) {
         return { ok: false, error: error.message };
       }
+    },
+    async captureSnapshot() {
+      return { composition: controller.getAccepted() };
+    },
+    async restoreSnapshot(snapshot) {
+      const result = controller.restoreTree(snapshot.composition);
+      if (!result.ok) throw new Error("Editor composition rollback failed.");
+      return result;
     },
     async apply({ prepared, staged }) {
       const result = controller.applyTree(staged.tree);
@@ -186,7 +193,9 @@ export function createEditorCompositionMcpBridge(options = {}) {
   const applyController = NexusEngine.createCompositionApplyController({
     composition,
     host,
-    initialSnapshot: project.compositionApplyState,
+    initialSnapshot: project.compositionApplyState?.schema === NexusEngine.COMPOSITION_APPLY_STATE_SCHEMA
+      ? project.compositionApplyState
+      : undefined,
     async persist(snapshot) {
       project.compositionApplyState = clone(snapshot);
       await persistProject?.(project);

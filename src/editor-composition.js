@@ -1,6 +1,9 @@
-export const EDITOR_PROJECT_VERSION = "0.3.0";
+export const EDITOR_PROJECT_VERSION = "0.4.0";
 export const COMPOSITION_TREE_SCHEMA = "nexusengine.composition-tree/1";
-export const PROJECT_REGISTRY_SCHEMA = "nexusengine.core-composition.registry/2";
+export const PROJECT_REGISTRY_SCHEMA = "nexusengine.composition-registry/3";
+
+const METADATA_SOURCE_COMMIT = "0000000000000000000000000000000000000000";
+const METADATA_SOURCE_INTEGRITY = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
 const clone = (value) => value === undefined ? undefined : structuredClone(value);
 const asList = (value) => Array.isArray(value) ? value : value == null ? [] : [value];
@@ -59,8 +62,11 @@ export function createProjectRegistryOverlay(project) {
     parentDomainPath: null,
     label: project.title ?? "Game Root",
     status: "project-local",
+    responsibility: "Own the authored project composition boundary.",
     ownedMeaning: ["The authored game composition boundary."],
     forbiddenResponsibilities: ["browser lifecycle", "renderer implementation", "GPU device ownership"],
+    requires: [],
+    provides: ["n:project"],
     settingsSchema: { type: "object", additionalProperties: true },
     sourceRegistryId: sourceId,
     metadata: { compositionRoot: true, projectLocal: true }
@@ -81,8 +87,11 @@ export function createProjectRegistryOverlay(project) {
       parentDomainPath: immediateParentPath(domainPath),
       label: row?.label ?? domainPath.split(":").at(-1),
       status: row?.status ?? "project-local",
+      responsibility: row?.subtitle ?? `Own project-local meaning bounded by ${domainPath}.`,
       ownedMeaning: [row?.subtitle ?? `Project-local meaning bounded by ${domainPath}.`],
       forbiddenResponsibilities: ["browser lifecycle", "renderer implementation", "GPU device ownership"],
+      requires: [],
+      provides: [domainPath],
       settingsSchema: inferSchema(project.kitConfigs?.[domainPath] ?? {}),
       sourceRegistryId: sourceId,
       metadata: {
@@ -101,10 +110,10 @@ export function createProjectRegistryOverlay(project) {
     const config = clone(project.kitConfigs?.[row.domainPath] ?? { enabled: true });
     kits.push({
       id,
-      version: "0.3.0",
+      version: EDITOR_PROJECT_VERSION,
       status: row.status === "missing" ? "blocked" : "project-local",
       kind: row.type ?? "domain-service-kit",
-      domain: row.domain ?? slug(row.domainPath),
+      responsibility: row.subtitle ?? `Represent project-local behavior for ${row.domainPath}.`,
       domainPath: row.domainPath,
       parentDomainPath: immediateParentPath(row.domainPath),
       apiName: null,
@@ -114,17 +123,39 @@ export function createProjectRegistryOverlay(project) {
       composes: [],
       defaults: config,
       settingsSchema: inferSchema(config),
-      preview: null,
-      source: { registryId: sourceId, exportName: null, module: null, trusted: false },
-      metadata: { projectLocal: true, legacyId: row.id ?? null, label: row.label, subtitle: row.subtitle }
+      source: {
+        registryId: sourceId,
+        subpath: null,
+        exportName: null,
+        environments: [],
+        permissions: [],
+        installable: false
+      },
+      metadata: {
+        projectLocal: true,
+        legacyId: row.id ?? null,
+        label: row.label,
+        subtitle: row.subtitle,
+        preview: null
+      }
     });
   }
-  const content = { domains, kits, bundles: [] };
+  const content = { domains, kits, recipes: [] };
   return {
     schema: PROJECT_REGISTRY_SCHEMA,
     registryId: sourceId,
     revision: 1,
-    sources: [{ registryId: sourceId, package: "nexusengine-editor-project", version: EDITOR_PROJECT_VERSION, contentHash: hash(content), trusted: false }],
+    sources: [{
+      registryId: sourceId,
+      package: "nexusengine-editor-project",
+      version: EDITOR_PROJECT_VERSION,
+      sourceCommit: METADATA_SOURCE_COMMIT,
+      integrity: METADATA_SOURCE_INTEGRITY,
+      status: "metadata-only",
+      environments: ["browser", "node"],
+      permissions: [],
+      metadata: { projectLocal: true, executable: false, contentIdentity: hash(content) }
+    }],
     ...content
   };
 }
@@ -171,7 +202,9 @@ export function createCompositionFromLegacy(project, overlay = createProjectRegi
 
 export function ensureProjectComposition(project) {
   project.version = EDITOR_PROJECT_VERSION;
-  project.compositionRegistryOverlay = project.compositionRegistryOverlay ?? createProjectRegistryOverlay(project);
+  if (project.compositionRegistryOverlay?.schema !== PROJECT_REGISTRY_SCHEMA) {
+    project.compositionRegistryOverlay = createProjectRegistryOverlay(project);
+  }
   project.composition = project.composition?.schema === COMPOSITION_TREE_SCHEMA
     ? clone(project.composition)
     : createCompositionFromLegacy(project, project.compositionRegistryOverlay);
@@ -357,25 +390,46 @@ function controllerUnavailable(project, reason) {
 export function createCompositionController(options = {}) {
   const { project, NexusEngine, globalObject = globalThis } = options;
   ensureProjectComposition(project);
-  const required = ["createCoreRegistrySnapshot", "mergeRegistrySnapshots", "normalizeCompositionTree", "validateCompositionTree", "planCompositionTree"];
+  const required = ["createEngineRegistrySnapshot", "mergeRegistrySnapshots", "normalizeCompositionTree", "validateCompositionTree", "planCompositionTree"];
   if (!NexusEngine || required.some((name) => typeof NexusEngine[name] !== "function")) {
-    return controllerUnavailable(project, "Connected NexusEngine lacks registry-v2 composition-tree support. Use a local 0.0.4-compatible Engine module.");
+    return controllerUnavailable(project, "Connected NexusEngine lacks composition-registry/3 support. Use the pinned 0.0.4 Engine package.");
   }
   let registry;
   try {
+    const coreRegistry = NexusEngine.createEngineRegistrySnapshot();
+    const coreIds = new Set([
+      ...coreRegistry.domains,
+      ...coreRegistry.kits,
+      ...coreRegistry.recipes
+    ].map((record) => record.id));
+    const coreDomainsByPath = new Map(coreRegistry.domains.map((record) => [record.domainPath, record]));
+    const domainReplacements = new Map();
+    for (const domain of project.compositionRegistryOverlay.domains) {
+      const coreDomain = coreDomainsByPath.get(domain.domainPath);
+      if (coreDomain) domainReplacements.set(domain.id, coreDomain.id);
+    }
+    if (domainReplacements.size) {
+      for (const node of project.composition.nodes) {
+        if (node.kind === "domain" && domainReplacements.has(node.registryId)) {
+          node.registryId = domainReplacements.get(node.registryId);
+        }
+      }
+      project.compositionRegistryOverlay.domains = project.compositionRegistryOverlay.domains
+        .filter((record) => !domainReplacements.has(record.id));
+    }
     const occupiedIds = new Set([
       ...project.compositionRegistryOverlay.domains,
       ...project.compositionRegistryOverlay.kits,
-      ...project.compositionRegistryOverlay.bundles
+      ...project.compositionRegistryOverlay.recipes
     ].map((record) => record.id));
     const occupiedPaths = new Set(project.compositionRegistryOverlay.domains.map((record) => record.domainPath));
     const imports = asList(options.registryImports).map((input) => ({
       ...clone(input),
-      domains: asList(input.domains).filter((record) => !occupiedIds.has(record.id) && !occupiedPaths.has(record.domainPath)),
-      kits: asList(input.kits).filter((record) => !occupiedIds.has(record.id)),
-      bundles: asList(input.bundles).filter((record) => !occupiedIds.has(record.id))
+      domains: asList(input.domains).filter((record) => !coreIds.has(record.id) && !coreDomainsByPath.has(record.domainPath) && !occupiedIds.has(record.id) && !occupiedPaths.has(record.domainPath)),
+      kits: asList(input.kits).filter((record) => !coreIds.has(record.id) && !occupiedIds.has(record.id)),
+      recipes: asList(input.recipes).filter((record) => !coreIds.has(record.id) && !occupiedIds.has(record.id))
     }));
-    registry = NexusEngine.mergeRegistrySnapshots(NexusEngine.createCoreRegistrySnapshot(), [...imports, project.compositionRegistryOverlay]);
+    registry = NexusEngine.mergeRegistrySnapshots(coreRegistry, [...imports, project.compositionRegistryOverlay]);
   } catch (error) {
     return controllerUnavailable(project, `Project registry overlay was rejected: ${error.message}`);
   }
@@ -416,15 +470,34 @@ export function createCompositionController(options = {}) {
     playRuntime = null;
     return { ok: disposal.ok, stopped: true, disposed: disposal.disposed, errors: disposal.errors };
   }
-  function createRuntime(plan) {
+  function planTree(scopeNodeId) {
+    const plan = NexusEngine.planCompositionTree(project.composition, registry, { scopeNodeId });
+    if (!plan.ok) return plan;
+    return {
+      ...clone(plan),
+      order: plan.order.map((entry) => ({
+        ...clone(entry),
+        preview: clone(maps.kits.get(entry.registryId)?.metadata?.preview ?? null)
+      }))
+    };
+  }
+  async function createRuntime(plan) {
     const factories = [];
     for (const entry of plan.order) {
-      if (!entry.trustedProvider || !entry.source?.exportName || typeof NexusEngine[entry.source.exportName] !== "function") {
+      const registrySource = registry.sources.find((source) => source.registryId === entry.source?.registryId);
+      const source = { ...clone(registrySource ?? {}), ...clone(entry.source ?? {}) };
+      const factory = await NexusEngine.resolveRegistryFactory?.(source);
+      if (typeof factory !== "function") {
         return { ok: false, verdict: "unavailable", error: `Preview unavailable: no trusted provider for ${entry.registryId}.` };
       }
-      factories.push(NexusEngine[entry.source.exportName](clone(entry.config)));
+      factories.push(factory(clone(entry.config)));
     }
-    const engine = NexusEngine.createRealtimeGame({ coreKits: false, tick: { maxDelta: 1 / 15 }, kits: factories });
+    const engine = NexusEngine.createEngine({
+      domainKits: false,
+      tick: { maxDelta: 1 / 15 },
+      kits: factories
+    });
+    engine.game = { installOrder: plan.order.map((entry) => entry.registryId) };
     return { ok: true, engine, factories };
   }
   function addReceipt(receipt) {
@@ -501,14 +574,24 @@ export function createCompositionController(options = {}) {
       return acceptTree(draft);
     },
     applyTree: (tree) => acceptTree(tree),
+    restoreTree(tree) {
+      stop();
+      project.composition = NexusEngine.normalizeCompositionTree(clone(tree));
+      draft = clone(project.composition);
+      selectedNodeId = draft.rootNodeId;
+      dirty = false;
+      refresh();
+      deriveLegacyCompositionProjections(project, registry);
+      return { ok: true, composition: clone(project.composition), report: clone(validation) };
+    },
     async runOnce(scopeNodeId = selectedNodeId) {
       if (dirty) return addReceipt({ id: `preview-${Date.now()}`, at: new Date().toISOString(), scopeNodeId, verdict: "blocked", ok: false, error: "Apply the draft before preview." });
-      const plan = NexusEngine.planCompositionTree(project.composition, registry, { scopeNodeId });
+      const plan = planTree(scopeNodeId);
       if (!plan.ok) return addReceipt({ id: `preview-${Date.now()}`, at: new Date().toISOString(), scopeNodeId, verdict: "failed", ok: false, plan, error: plan.errors?.[0]?.message ?? "Composition plan failed." });
       const started = performance.now();
       let runtime = null;
       try {
-        runtime = createRuntime(plan);
+        runtime = await createRuntime(plan);
         if (!runtime.ok) return addReceipt({ id: `preview-${Date.now()}`, at: new Date().toISOString(), scopeNodeId, resolvedKits: plan.order.map((entry) => entry.registryId), installOrder: plan.order.map((entry) => entry.registryId), verdict: runtime.verdict, ok: false, durationMs: performance.now() - started, error: runtime.error });
         const before = snapshotEngine(runtime.engine);
         const previewActions = await executePreviewPlan(runtime.engine, plan, globalObject);
@@ -531,12 +614,12 @@ export function createCompositionController(options = {}) {
         disposeRuntime(runtime);
       }
     },
-    play(scopeNodeId = draft.rootNodeId) {
+    async play(scopeNodeId = draft.rootNodeId) {
       if (dirty) return { ok: false, error: "Apply the draft before Play." };
       stop();
-      const plan = NexusEngine.planCompositionTree(project.composition, registry, { scopeNodeId });
+      const plan = planTree(scopeNodeId);
       if (!plan.ok) return { ok: false, error: plan.errors?.[0]?.message ?? "Composition plan failed." };
-      const runtime = createRuntime(plan);
+      const runtime = await createRuntime(plan);
       if (!runtime.ok) return runtime;
       playRuntime = { engine: runtime.engine, frameId: null, intervalId: null, lastTime: performance.now() };
       const frame = (time) => {

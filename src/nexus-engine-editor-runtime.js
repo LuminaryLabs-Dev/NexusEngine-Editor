@@ -41,7 +41,8 @@ import {
   validateEditorFeatureContracts
 } from "./kits/editor-feature-contracts-kit/index.js";
 
-export const NEXUS_ENGINE_CDN_URL = "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@0.0.3/src/index.js";
+export const NEXUS_ENGINE_COMMIT = "a68544434424438491be1398e3f3d5aced5bc5ee";
+export const NEXUS_ENGINE_CDN_URL = "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@" + NEXUS_ENGINE_COMMIT + "/src/index.js";
 const DEFAULT_PROJECT_STORAGE_KEY = "nexusengine-editor:project-snapshot";
 const VIEWPORT_TOOL_IDS = Object.freeze(["select", "move", "rotate", "scale", "pan"]);
 const VIEWPORT_TOOL_SET = new Set(VIEWPORT_TOOL_IDS);
@@ -60,34 +61,21 @@ function normalizeTokenList(value, fieldName, kitId) {
   });
 }
 
-function createFallbackNexusEngine() {
-  function defineRuntimeKit(config = {}) {
-    const id = config.id ?? "runtime-kit";
-    return Object.freeze({
-      id,
-      requires: normalizeTokenList(config.requires, "requires", id),
-      provides: normalizeTokenList(config.provides, "provides", id),
-      bindings: Object.freeze({ ...(config.bindings ?? {}) }),
-      metadata: Object.freeze({ ...(config.metadata ?? {}) }),
-      install: config.install
-    });
-  }
-
-  function createGameKitComposer(config = {}) {
-    const sourceKits = asList(config.kits);
-    const seenIds = new Set();
-    const pending = [];
-    for (const kit of sourceKits) {
+function createEditorKitComposer(config = {}) {
+  const sourceKits = asList(config.kits);
+  const seenIds = new Set();
+  const pending = [];
+  for (const kit of sourceKits) {
       if (!kit || typeof kit !== "object") throw new TypeError("createGameKitComposer expects runtime kit objects.");
       if (typeof kit.id !== "string" || kit.id.trim().length === 0) throw new TypeError("Runtime kits composed for a game must have stable ids.");
       if (seenIds.has(kit.id)) throw new Error(`Duplicate runtime kit id: ${kit.id}`);
       seenIds.add(kit.id);
       pending.push(kit);
-    }
+  }
 
-    const orderedKits = [];
-    const available = new Set(asList(config.provides));
-    while (pending.length) {
+  const orderedKits = [];
+  const available = new Set(asList(config.provides));
+  while (pending.length) {
       let installedIndex = -1;
       for (let index = 0; index < pending.length; index += 1) {
         const kit = pending[index];
@@ -107,11 +95,11 @@ function createFallbackNexusEngine() {
       orderedKits.push(kit);
       available.add(kit.id);
       for (const token of normalizeTokenList(kit.provides, "provides", kit.id)) available.add(token);
-    }
+  }
 
-    const bindings = {};
-    for (const kit of orderedKits) Object.assign(bindings, kit.bindings ?? {});
-    return Object.freeze({
+  const bindings = {};
+  for (const kit of orderedKits) Object.assign(bindings, kit.bindings ?? {});
+  return Object.freeze({
       kits: orderedKits,
       orderedKits,
       installOrder: orderedKits.map((kit) => kit.id),
@@ -123,11 +111,24 @@ function createFallbackNexusEngine() {
       hasProvider(name) {
         return available.has(name);
       }
+  });
+}
+
+function createFallbackNexusEngine() {
+  function defineRuntimeKit(config = {}) {
+    const id = config.id ?? "runtime-kit";
+    return Object.freeze({
+      id,
+      requires: normalizeTokenList(config.requires, "requires", id),
+      provides: normalizeTokenList(config.provides, "provides", id),
+      bindings: Object.freeze({ ...(config.bindings ?? {}) }),
+      metadata: Object.freeze({ ...(config.metadata ?? {}) }),
+      install: config.install
     });
   }
 
-  function createRealtimeGame(config = {}) {
-    const composer = config.composer ?? createGameKitComposer({ kits: config.kits ?? [] });
+  function createEngine(config = {}) {
+    const composer = config.composer ?? createEditorKitComposer({ kits: config.kits ?? [] });
     const engine = {
       world: {},
       scheduler: { addSystem() {} },
@@ -148,8 +149,7 @@ function createFallbackNexusEngine() {
 
   return Object.freeze({
     defineRuntimeKit,
-    createGameKitComposer,
-    createRealtimeGame
+    createEngine
   });
 }
 
@@ -157,9 +157,48 @@ function isNexusEngineModule(candidate) {
   return Boolean(
     candidate &&
     typeof candidate.defineRuntimeKit === "function" &&
-    typeof candidate.createGameKitComposer === "function" &&
-    typeof candidate.createRealtimeGame === "function"
+    typeof candidate.createEngine === "function"
   );
+}
+
+function isCompositionModule(candidate) {
+  return Boolean(
+    candidate &&
+    typeof candidate.createEngineRegistrySnapshot === "function" &&
+    typeof candidate.mergeRegistrySnapshots === "function" &&
+    typeof candidate.normalizeCompositionTree === "function" &&
+    typeof candidate.validateCompositionTree === "function" &&
+    typeof candidate.planCompositionTree === "function"
+  );
+}
+
+function compositionModuleUrl(engineUrl) {
+  try {
+    return new URL("./core-domains/composition/index.js", engineUrl).href;
+  } catch {
+    return null;
+  }
+}
+
+function createBrowserFactoryResolver(engineUrl, importModule, globalObject) {
+  let packageManifestPromise = null;
+  return async function resolveRegistryFactory(source = {}) {
+    if (source.registryId !== "nexusengine-core" || source.package !== "nexusengine") return null;
+    if (source.installable !== true || !source.subpath || !source.exportName) return null;
+    packageManifestPromise ??= globalObject.fetch(new URL("../package.json", engineUrl), { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error(`NexusEngine package manifest failed with HTTP ${response.status}.`);
+        return response.json();
+      });
+    const packageManifest = await packageManifestPromise;
+    const target = packageManifest.exports?.[source.subpath];
+    if (typeof target !== "string" || !target.startsWith("./") || target.includes("..")) {
+      throw new Error(`NexusEngine does not export ${source.subpath}.`);
+    }
+    const moduleUrl = new URL(`../${target.slice(2)}`, engineUrl).href;
+    const module = await importModule(moduleUrl);
+    return typeof module[source.exportName] === "function" ? module[source.exportName] : null;
+  };
 }
 
 function createProjectStorageAdapter(storage = globalThis?.localStorage) {
@@ -206,13 +245,31 @@ export async function loadNexusEngineModule(options = {}) {
 
   if (allowRemote && typeof url === "string" && url) {
     try {
-      const module = await Promise.race([
+      const runtimeModule = await Promise.race([
         importModule(url),
         new Promise((_, reject) => {
           globalObject.setTimeout?.(() => reject(new Error("NexusEngine import timed out.")), timeoutMs);
         })
       ]);
-      if (isNexusEngineModule(module)) return { module, source: url };
+      if (isNexusEngineModule(runtimeModule)) {
+        let compositionModule = runtimeModule;
+        if (!isCompositionModule(compositionModule)) {
+          const compositionUrl = compositionModuleUrl(url);
+          if (!compositionUrl) throw new Error("NexusEngine Composition module URL could not be resolved.");
+          compositionModule = await importModule(compositionUrl);
+        }
+        if (!isCompositionModule(compositionModule)) {
+          throw new Error("NexusEngine Composition module does not satisfy the Editor contract.");
+        }
+        return {
+          module: Object.freeze({
+            ...runtimeModule,
+            ...compositionModule,
+            resolveRegistryFactory: createBrowserFactoryResolver(url, importModule, globalObject)
+          }),
+          source: url
+        };
+      }
     } catch {
       return { module: null, source: "fallback:remote-unavailable" };
     }
@@ -1181,9 +1238,20 @@ export function createNexusEngineEditorRuntime(options = {}) {
     kitMutationMode,
     recordEvent: (type, payload) => options.recordEvent?.(type, payload)
   });
-  const composer = NexusEngine.createGameKitComposer({ kits });
-  const engine = NexusEngine.createRealtimeGame({ kits: composer.kits, composer, root, canvas });
-  const bindings = composer.bindings ?? engine.game?.bindings ?? {};
+  const composer = createEditorKitComposer({ kits });
+  const engine = NexusEngine.createEngine({
+    domainKits: false,
+    kits: composer.kits,
+    root,
+    canvas
+  });
+  engine.gameComposer = composer;
+  engine.game = {
+    root: root ?? canvas,
+    bindings: composer.bindings,
+    installOrder: composer.installOrder
+  };
+  const bindings = composer.bindings;
 
   return {
     source: runtimeSource,

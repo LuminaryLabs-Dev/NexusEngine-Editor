@@ -1,14 +1,14 @@
 export const EDITOR_FEATURE_CONTRACTS_KIT_ID = "editor-feature-contracts-kit";
 
-const protoKitSources = Object.freeze({
-  sceneRecipes: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/scene-recipe-kit",
-  dataRegistry: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/data-registry-kit",
-  buildPlacement: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/build-placement-kit",
-  tokenRegistry: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/token-registry-kit",
-  genericInput: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/action-input-kit",
-  selection: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/generic-interactable-kit",
-  renderer: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/generic-three-renderer-kit",
-  sequence: "LuminaryLabs-Agents/NexusRealtime-ProtoKits/protokits/generic-camera-sequence-kit"
+const featureSources = Object.freeze({
+  sceneRecipes: "local:NexusEngine-Editor/src/editor-domain-model.js",
+  dataRegistry: "local:NexusEngine-Editor/src/editor-domain-model.js",
+  buildPlacement: "nexusengine/domains/object/placement",
+  tokenRegistry: "nexusengine/domains/composition",
+  genericInput: "nexusengine/domains/interaction/input",
+  selection: "local:NexusEngine-Editor/src/nexus-engine-editor-runtime.js",
+  renderer: "local:NexusEngine-Editor/src/viewport-webgl.js",
+  sequence: "local:NexusEngine-Editor/src/editor-domain-model.js"
 });
 
 export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
@@ -37,7 +37,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-kit-registry-kit",
     requires: ["n:registry:index", "n:registry:search", "n:registry:dependency"],
     provides: ["editor:kit-picker", "editor:registry-manifest"],
-    source: protoKitSources.tokenRegistry
+    source: featureSources.tokenRegistry
   },
   {
     featureId: "cli-only-kit-install",
@@ -55,7 +55,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-viewport-kit",
     requires: ["n:render:three", "n:scene", "n:camera"],
     provides: ["editor:webgl-viewport", "editor:viewport-stats"],
-    source: protoKitSources.renderer
+    source: featureSources.renderer
   },
   {
     featureId: "viewport-transform-tools",
@@ -64,7 +64,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-selection-kit",
     requires: ["n:scene", "n:input", "n:editor:viewport"],
     provides: ["editor:selection", "editor:viewport-tools"],
-    source: protoKitSources.selection
+    source: featureSources.selection
   },
   {
     featureId: "scene-object-authoring",
@@ -73,7 +73,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-scene-object-kit",
     requires: ["n:editor:composition", "n:editor:selection"],
     provides: ["editor:scene-object", "editor:object-transform", "editor:bulk-grid"],
-    source: protoKitSources.buildPlacement
+    source: featureSources.buildPlacement
   },
   {
     featureId: "configure-panel",
@@ -91,7 +91,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-scene-preset-kit",
     requires: ["n:scene", "n:physics", "n:render:three"],
     provides: ["editor:scene-preset", "editor:role-stamping"],
-    source: protoKitSources.sceneRecipes
+    source: featureSources.sceneRecipes
   },
   {
     featureId: "game-template-authoring",
@@ -100,7 +100,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-game-template-kit",
     requires: ["n:registry:install", "n:editor:scene-preset", "n:editor:dock:sequence"],
     provides: ["editor:game-template", "editor:template-scene-data"],
-    source: protoKitSources.dataRegistry
+    source: featureSources.dataRegistry
   },
   {
     featureId: "sequence-timeline",
@@ -109,7 +109,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-sequence-timeline-kit",
     requires: ["n:registry", "n:editor:domain-stack", "n:editor:selection"],
     provides: ["editor:sequence-timeline", "editor:sequence-graph", "editor:sequence-receipts"],
-    source: protoKitSources.sequence
+    source: featureSources.sequence
   },
   {
     featureId: "project-persistence",
@@ -118,7 +118,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-project-persistence-kit",
     requires: ["n:editor:composition", "n:editor:status"],
     provides: ["editor:project-snapshot", "file:project", "save:scene"],
-    source: "NexusEngine@0.0.3/core-kits/core-persistence-kit"
+    source: "nexusengine/domains/runtime/persistence"
   },
   {
     featureId: "html-build-export",
@@ -127,7 +127,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-html-build-kit",
     requires: ["n:scene", "n:editor:dock:sequence", "n:persistence"],
     provides: ["editor:html-build", "export:html", "runtime:canvas-3d"],
-    source: "NexusEngine@0.0.3/core-kits/core-platform-kit"
+    source: "local:NexusEngine-Editor/src/dsk-html-builder.js"
   },
   {
     featureId: "runtime-interactions",
@@ -136,7 +136,7 @@ export const EDITOR_FEATURE_CONTRACTS = Object.freeze([
     owningKitId: "editor-runtime-interaction-kit",
     requires: ["n:input", "n:scene", "n:editor:dock:sequence"],
     provides: ["editor:runtime-interaction", "interaction:hit", "score:value"],
-    source: protoKitSources.genericInput
+    source: featureSources.genericInput
   },
   {
     featureId: "screenshot-mcp",

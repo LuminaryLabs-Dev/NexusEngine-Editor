@@ -4,6 +4,12 @@
   "type": "module",
   "private": true,
   "description": "Static NexusEngine web editor shell for building DSK-driven games as HTML files.",
+  "nexusEngineArtifact": {
+    "version": "0.0.4",
+    "commit": "a68544434424438491be1398e3f3d5aced5bc5ee",
+    "registryHash": "sha256:fb253d7c33d1b271857591e21f6eaca1f32e470385d6080a131813261c767cc8",
+    "tarballSha256": "b7f8c3833ea7f035a4c82d09f18ffe30d430729418ca1ee06fe069b9e34de94d"
+  },
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
     "build:game": "node scripts/build-dsk-game-html.mjs examples/dsk-games/starter-game.json dist/games/starter-game.html",
@@ -19,7 +25,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#91ebeeebb4f4f9bb121d13e0a97b6eac849ae485",
+    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#a68544434424438491be1398e3f3d5aced5bc5ee",
     "playwright": "^1.61.1"
   },
   "overrides": {

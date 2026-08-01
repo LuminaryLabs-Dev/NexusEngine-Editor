@@ -1,7 +1,10 @@
 import { clone, installDomainKitManifest } from "./editor-domain-model.js";
 
 export const KIT_REGISTRY_VERSION = "0.1.0";
-export const EDITOR_REGISTRY_SCHEMA = "nexusengine.core-composition.registry/2";
+export const EDITOR_REGISTRY_SCHEMA = "nexusengine.composition-registry/3";
+
+const METADATA_SOURCE_COMMIT = "0000000000000000000000000000000000000000";
+const METADATA_SOURCE_INTEGRITY = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
 
 function asList(value) {
   if (value === undefined || value === null) return [];
@@ -69,8 +72,11 @@ export function createEditorRegistrySnapshot(manifests = NEXUS_ENGINE_KIT_MANIFE
       parentDomainPath: declaredParent,
       label: first?.label ?? domainPath,
       status: first?.status ?? "experimental",
+      responsibility: first?.subtitle ?? `Own Editor metadata bounded by ${domainPath}.`,
       ownedMeaning: [first?.subtitle ?? `Editor registry meaning bounded by ${domainPath}.`],
       forbiddenResponsibilities: ["browser lifecycle", "renderer implementation", "GPU device ownership"],
+      requires: [],
+      provides: [domainPath],
       settingsSchema: { type: "object", additionalProperties: true },
       sourceRegistryId: "nexusengine-editor-registry",
       metadata: { editorRegistry: true }
@@ -81,7 +87,7 @@ export function createEditorRegistrySnapshot(manifests = NEXUS_ENGINE_KIT_MANIFE
     version: kit.version,
     status: kit.status,
     kind: kit.type,
-    domain: kit.domain,
+    responsibility: kit.subtitle,
     domainPath: kit.domainPath,
     parentDomainPath: domains.find((domain) => domain.domainPath === kit.domainPath)?.parentDomainPath ?? null,
     apiVisibility: kit.apiVisibility,
@@ -90,19 +96,42 @@ export function createEditorRegistrySnapshot(manifests = NEXUS_ENGINE_KIT_MANIFE
     composes: clone(kit.children),
     defaults: clone(kit.defaults),
     settingsSchema: clone(kit.settingsSchema),
-    preview: clone(kit.preview),
-    source: { registryId: "nexusengine-editor-registry", exportName: null, module: kit.path, trusted: false },
-    metadata: { label: kit.label, subtitle: kit.subtitle, category: kit.category, rendererBoundary: kit.rendererBoundary, performance: kit.performance }
+    source: {
+      registryId: "nexusengine-editor-registry",
+      subpath: null,
+      exportName: null,
+      environments: [],
+      permissions: [],
+      installable: false
+    },
+    metadata: {
+      label: kit.label,
+      subtitle: kit.subtitle,
+      category: kit.category,
+      declaredPackagePath: kit.path,
+      preview: clone(kit.preview),
+      rendererBoundary: kit.rendererBoundary,
+      performance: kit.performance
+    }
   }));
-  const contentHash = `editor-${JSON.stringify({ domains, records }).length.toString(16)}`;
   return {
     schema: EDITOR_REGISTRY_SCHEMA,
     registryId: "nexusengine-editor-registry",
     revision: 1,
-    sources: [{ registryId: "nexusengine-editor-registry", package: "@luminarylabs/nexusengine-editor", version: KIT_REGISTRY_VERSION, contentHash, trusted: false }],
+    sources: [{
+      registryId: "nexusengine-editor-registry",
+      package: "@luminarylabs/nexusengine-editor",
+      version: KIT_REGISTRY_VERSION,
+      sourceCommit: METADATA_SOURCE_COMMIT,
+      integrity: METADATA_SOURCE_INTEGRITY,
+      status: "metadata-only",
+      environments: ["browser", "node"],
+      permissions: [],
+      metadata: { editorRegistry: true, executable: false }
+    }],
     domains,
     kits: records,
-    bundles: []
+    recipes: []
   };
 }
 
@@ -207,7 +236,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Kit Manifest Registry",
     subtitle: "Machine-readable kit manifests",
     type: "control-domain-service-kit",
-    path: "@luminarylabs/nexusengine-protokits/kit-manifest-domain-kit",
+    path: "nexusengine/domains/composition",
     provides: ["kit:manifest-registry", "kit:metadata", "domain:catalog"],
     resources: ["kitManifest.state"],
     events: ["kitManifest.registered", "kitManifest.validated"],
@@ -223,7 +252,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Capability Graph",
     subtitle: "Requires/provides graph",
     type: "control-domain-service-kit",
-    path: "@luminarylabs/nexusengine-protokits/capability-graph-domain-kit",
+    path: "nexusengine/domains/composition",
     provides: ["domain:capability-graph"],
     resources: ["capabilityGraph.state"],
     publicApi: ["engine.capabilityGraph.buildGraph"],
@@ -238,7 +267,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Composition Planning",
     subtitle: "Install plans and dependency gaps",
     type: "control-domain-service-kit",
-    path: "@luminarylabs/nexusengine-protokits/composition-planning-domain-kit",
+    path: "nexusengine/domains/composition",
     requires: ["domain:capability-graph"],
     provides: ["domain:composition-planning", "domain:install-plan", "domain:dependency-gap-report"],
     resources: ["compositionPlanning.state"],
@@ -255,7 +284,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Deploy Manifest",
     subtitle: "HTML/export deployment manifest",
     type: "deploy-kit",
-    path: "@luminarylabs/nexusengine-protokits/deploy-manifest-kit",
+    path: "@luminarylabs/nexusengine-kits/deploy-manifest-kit",
     provides: ["deploy:manifest", "export:html"],
     resources: ["deployManifest.state"],
     publicApi: ["engine.deployManifest.getState"]
@@ -268,7 +297,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Spatial Authoring Bundle",
     subtitle: "Scene graph, selection, transforms, widgets",
     type: "composite-domain-service-kit",
-    path: "@luminarylabs/nexusengine-protokits/spatial-authoring-kits",
+    path: "@luminarylabs/nexusengine-kits/spatial-authoring-kits",
     provides: ["domain:spatial-authoring"],
     children: [
       "spatial-scene-graph-kit",
@@ -288,7 +317,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Spatial Scene Graph",
     subtitle: "Object hierarchy and scene patches",
-    path: "@luminarylabs/nexusengine-protokits/spatial-scene-graph-kit",
+    path: "nexusengine/domains/world/scene",
     provides: ["n:spatial-scene-graph", "scene:graph"],
     resources: ["sceneGraph.state"],
     events: ["sceneGraph.patched"],
@@ -303,7 +332,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Selection",
     subtitle: "Selected object/domain state",
-    path: "@luminarylabs/nexusengine-protokits/selection-domain-service-kit",
+    path: "local:NexusEngine-Editor/src/nexus-engine-editor-runtime.js",
     requires: ["scene:graph"],
     provides: ["n:selection", "editor:selection"],
     resources: ["selection.state"],
@@ -318,7 +347,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Transform",
     subtitle: "Position, rotation, scale edits",
-    path: "@luminarylabs/nexusengine-protokits/transform-domain-service-kit",
+    path: "nexusengine/domains/spatial/transform-math",
     requires: ["scene:graph"],
     provides: ["n:transform", "spatial:transform"],
     resources: ["transform.state"],
@@ -333,7 +362,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Widget",
     subtitle: "Gizmos and editor widgets",
-    path: "@luminarylabs/nexusengine-protokits/widget-domain-service-kit",
+    path: "local:NexusEngine-Editor/src/nexus-engine-editor-runtime.js",
     requires: ["spatial:transform"],
     provides: ["n:widget", "editor:widget"],
     descriptors: ["widget.descriptors"],
@@ -347,7 +376,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Interaction",
     subtitle: "Object interaction requests",
-    path: "@luminarylabs/nexusengine-protokits/interaction-domain-service-kit",
+    path: "nexusengine/domains/interaction",
     provides: ["n:interaction", "interaction:request"],
     resources: ["interaction.state"],
     events: ["interaction.requested", "interaction.completed"],
@@ -361,7 +390,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Spatial Authoring",
     label: "Persistence",
     subtitle: "Project file snapshots",
-    path: "@luminarylabs/nexusengine-protokits/persistence-domain-service-kit",
+    path: "nexusengine/domains/runtime/persistence",
     provides: ["n:persistence", "save:scene", "file:project"],
     resources: ["persistence.state"],
     events: ["persistence.saved", "persistence.loaded", "persistence.exported", "persistence.imported"],
@@ -375,7 +404,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Rendering",
     label: "Render Descriptor",
     subtitle: "Renderer-agnostic draw data",
-    path: "@luminarylabs/nexusengine-protokits/render-descriptor-domain-kit",
+    path: "nexusengine/domains/presentation/graphics",
     provides: ["n:render-descriptor", "render:descriptors"],
     descriptors: ["render.object", "render.layer"],
     rendererBoundary: { outputsDescriptors: true }
@@ -387,7 +416,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Rendering",
     label: "Stereoscopic Render",
     subtitle: "XR stereo render descriptors",
-    path: "@luminarylabs/nexusengine-protokits/stereoscopic-render-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/stereoscopic-render-domain-kit",
     requires: ["render:descriptors"],
     provides: ["n:stereoscopic-render", "render:stereo"],
     descriptors: ["render.stereo"],
@@ -400,7 +429,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Presentation",
     label: "Audio Feedback",
     subtitle: "Audio event descriptors",
-    path: "@luminarylabs/nexusengine-protokits/audio-feedback-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/audio-feedback-domain-kit",
     provides: ["n:audio-feedback", "audio:feedback"],
     resources: ["audioFeedback.state"],
     events: ["audioFeedback.cued"],
@@ -414,7 +443,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Input",
     label: "Input Actions",
     subtitle: "Semantic input action map",
-    path: "@luminarylabs/nexusengine-protokits/generic-input-actions-kit",
+    path: "nexusengine/domains/interaction/input",
     provides: ["n:input-actions", "input:actions"],
     resources: ["inputActions.state"],
     events: ["inputActions.changed"],
@@ -428,7 +457,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "World",
     label: "World Zone",
     subtitle: "Zone membership and enter/exit events",
-    path: "@luminarylabs/nexusengine-protokits/world-zone-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/world-zone-domain-kit",
     provides: ["n:world-zone", "world:zones"],
     resources: ["worldZoneDomain.state"],
     events: ["worldZone.entered", "worldZone.exited"],
@@ -442,7 +471,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "World",
     label: "Terrain Height",
     subtitle: "Height sampler service",
-    path: "@luminarylabs/nexusengine-protokits/terrain-height-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/terrain-height-domain-kit",
     provides: ["n:terrain-height", "terrain:height"],
     resources: ["terrainHeightDomain.state"],
     publicApi: ["engine.terrainHeightDomain.heightAt"]
@@ -455,7 +484,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "World",
     label: "Route Clearance",
     subtitle: "Route-safe spacing checks",
-    path: "@luminarylabs/nexusengine-protokits/route-clearance-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/route-clearance-domain-kit",
     provides: ["n:route-clearance", "placement:route-clearance"],
     resources: ["routeClearanceDomain.state"],
     events: ["routeClearance.checked"],
@@ -469,7 +498,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "World",
     label: "Vegetation Placement",
     subtitle: "Accepted/rejected vegetation placement",
-    path: "@luminarylabs/nexusengine-protokits/vegetation-placement-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/vegetation-placement-domain-kit",
     requires: ["terrain:height", "placement:route-clearance"],
     provides: ["n:vegetation-placement", "vegetation:placement"],
     resources: ["vegetationPlacementDomain.state"],
@@ -484,7 +513,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Gameplay",
     label: "Damage Health",
     subtitle: "Health, damage, restore, defeat",
-    path: "@luminarylabs/nexusengine-protokits/damage-health-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/damage-health-domain-kit",
     provides: ["n:damage-health", "combat:health"],
     resources: ["damageHealthDomain.state"],
     events: ["damageHealth.applied", "damageHealth.restored", "damageHealth.defeated"],
@@ -498,7 +527,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Gameplay",
     label: "Mana Meter",
     subtitle: "Mana spend, gain, regeneration",
-    path: "@luminarylabs/nexusengine-protokits/mana-meter-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/mana-meter-domain-kit",
     provides: ["n:mana-meter", "magic:mana"],
     resources: ["manaMeterDomain.state"],
     events: ["mana.changed", "mana.rejected"],
@@ -512,7 +541,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Gameplay",
     label: "Status Effect",
     subtitle: "Timed effects and expiry",
-    path: "@luminarylabs/nexusengine-protokits/status-effect-domain-kit",
+    path: "@luminarylabs/nexusengine-kits/status-effect-domain-kit",
     provides: ["n:status-effect", "combat:statuses"],
     resources: ["statusEffectDomain.state"],
     events: ["statusEffect.applied", "statusEffect.expired"],
@@ -526,7 +555,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Gameplay",
     label: "Defense Session Command",
     subtitle: "Tower-defense session commands",
-    path: "@luminarylabs/nexusengine-protokits/generic-defense-session-command-kit",
+    path: "@luminarylabs/nexusengine-kits/generic-defense-session-command-kit",
     provides: ["n:generic-defense-session-command", "game:session-command"],
     resources: ["genericDefenseSessionCommand.state"],
     events: ["sessionCommand.issued"],
@@ -540,7 +569,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "Gameplay",
     label: "Route Cargo Extraction",
     subtitle: "Route progress plus cargo extraction",
-    path: "@luminarylabs/nexusengine-protokits/generic-route-cargo-extraction-kit",
+    path: "@luminarylabs/nexusengine-kits/generic-route-cargo-extraction-kit",
     provides: ["n:route-cargo-extraction", "objective:cargo-extraction"],
     resources: ["routeCargoExtraction.state"],
     events: ["cargo.picked", "cargo.delivered"],
@@ -554,7 +583,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     category: "World",
     label: "Banded Infinite Terrain",
     subtitle: "Streaming terrain bands",
-    path: "@luminarylabs/nexusengine-protokits/banded-infinite-terrain-kit",
+    path: "@luminarylabs/nexusengine-kits/banded-infinite-terrain-kit",
     provides: ["n:banded-infinite-terrain", "terrain:streaming"],
     descriptors: ["terrain.band", "terrain.patch"],
     publicApi: ["engine.bandedInfiniteTerrain.getState"],
@@ -568,7 +597,7 @@ export const NEXUS_ENGINE_KIT_MANIFESTS = Object.freeze([
     label: "Aerial Flight Bundle",
     subtitle: "Flight body, weather, camera, mission",
     type: "composite-domain-service-kit",
-    path: "@luminarylabs/nexusengine-protokits/aerial-flight-kits",
+    path: "@luminarylabs/nexusengine-kits/aerial-flight-kits",
     provides: ["n:aerial-flight", "aerial:body", "aerial:mission"],
     children: ["powered-aerial-flight-domain-kit", "aerial-camera-rig-domain-kit", "aerial-mission-sequence-kit"],
     descriptors: ["aerial.flight-stack"]
