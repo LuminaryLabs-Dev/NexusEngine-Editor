@@ -10,6 +10,7 @@ Architecture shape:
 - `src/editor-domain-model.js` owns the editable 3D scene, compatibility projections, kit config, and sequence timeline model.
 - `src/editor-composition.js` owns project-format `0.4.0` migration, the staged registry-reference tree, atomic Apply, reference protection, trusted factory resolution, disposable Run Once previews, and disposable Play instances.
 - `src/editor-composition-mcp.js` adapts Core Composition MCP plans to the existing Editor controller, resolves only trusted Engine factories, fingerprints executable Kits, and persists exactly-once apply receipts in the project.
+- `src/headless/index.js` owns the Node-only file-backed nine-stage Headless Editor host. It is exported as `@luminarylabs/nexusengine-editor/headless`; Engine Core does not own this host implementation.
 - `src/viewport-webgl.js` owns the dependency-free WebGL viewport renderer for grid, axes, default cube, and play-mode animation.
 - `src/kits/editor-kits.js` owns editor kit descriptors and lightweight state.
 - `src/kits/editor-feature-contracts-kit/index.js` owns the required editor feature contract map, including owning local Kit, current Engine/Kits source, required tokens, and provided tokens.

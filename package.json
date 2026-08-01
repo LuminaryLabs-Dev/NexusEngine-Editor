@@ -4,6 +4,10 @@
   "type": "module",
   "private": true,
   "description": "Static NexusEngine web editor shell for building DSK-driven games as HTML files.",
+  "exports": {
+    "./headless": "./src/headless/index.js",
+    "./adapters/node-mcp-sdk": "./src/adapters/node-mcp-sdk-adapter.js"
+  },
   "nexusEngineArtifact": {
     "version": "0.0.4",
     "commit": "a68544434424438491be1398e3f3d5aced5bc5ee",

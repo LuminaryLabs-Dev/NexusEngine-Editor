@@ -13,6 +13,7 @@ import { createEditorKitInstallSurface, createEditorRegistrySnapshot, normalizeK
 import { createCompositionController } from "../src/editor-composition.js";
 import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runtime.js";
 import { validateEditorFeatureContracts } from "../src/kits/editor-feature-contracts-kit/index.js";
+import { HEADLESS_EDITOR_STAGE_ORDER, createHeadlessEditorHarness } from "../src/headless/index.js";
 
 async function connectEditorMcp(projectPath, { allowWrites = false } = {}) {
   const client = new Client({ name: "nexusengine-editor-intent-smoke", version: "0.1.0" });
@@ -70,6 +71,32 @@ const requiredFeatureContracts = [
   "screenshot-mcp"
 ];
 assert.equal(validateEditorFeatureContracts(requiredFeatureContracts).ok, true);
+
+const headlessWorkspace = mkdtempSync(join(tmpdir(), "nexus-editor-headless-"));
+try {
+  const headless = createHeadlessEditorHarness({
+    workspace: { kind: "file", root: headlessWorkspace },
+    goal: "Prove one bounded host-owned operation.",
+    sessionId: "editor-headless-smoke",
+    adapter: {
+      id: "editor-headless-smoke-adapter",
+      read: async () => ({ ok: true, scene: { id: "before" }, assets: [], runtime: {} }),
+      capture: async ({ phase }) => ({ ok: true, phase, captures: [] }),
+      plan: async () => ({ ok: true, commands: [{ action: "editor.prove" }] }),
+      validate: async () => ({ ok: true, issues: [] }),
+      submit: async () => ({ ok: true, submitted: true, runId: "editor-headless-smoke" }),
+      observe: async () => ({ ok: true, status: "completed", runId: "editor-headless-smoke" }),
+      verify: async () => ({ ok: true, checks: [{ id: "bounded", ok: true }], readAfter: { scene: { id: "after" } } })
+    }
+  });
+  const result = await headless.run();
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.stageResults.map((entry) => entry.stage), HEADLESS_EDITOR_STAGE_ORDER);
+  assert.equal(existsSync(join(headlessWorkspace, "observed-differences", "difference.json")), true);
+  assert.equal(existsSync(join(headlessWorkspace, "report.md")), true);
+} finally {
+  rmSync(headlessWorkspace, { recursive: true, force: true });
+}
 
 const readOnlyState = createEditorState();
 readOnlyState.editorRuntime = createNexusEngineEditorRuntime({

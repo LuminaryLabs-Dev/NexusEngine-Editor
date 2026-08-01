@@ -50,6 +50,14 @@ npm run mcp:screenshot
 npm run mcp:game
 ```
 
+Node hosts can import the file-backed nine-stage Headless Editor without adding host behavior to Engine Core:
+
+```js
+import { createHeadlessEditorHarness } from "@luminarylabs/nexusengine-editor/headless";
+```
+
+The host owns `read -> capture-before -> plan -> validate -> submit -> observe -> verify -> capture-after -> observed-differences`. Engine remains limited to reusable contracts and composition atoms.
+
 `npm run cli:chess` creates a DSK-driven chess project and single-file game export at `dist/games/nexus-chess.html` plus `dist/games/nexus-chess.project.json`. The chess template is engine data: 64 square objects, 32 piece objects, a `n:game:chess` rules kit, and kit-linked sequence steps.
 
 `npm run cli:target-clicker` creates a small playable target-clicker export at `dist/games/nexus-target-clicker.html` plus `dist/games/nexus-target-clicker.project.json`. The export includes target hit handling, score state, reset controls, and sequence receipts.
