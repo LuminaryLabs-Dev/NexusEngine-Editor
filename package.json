@@ -32,6 +32,18 @@
     "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#a68544434424438491be1398e3f3d5aced5bc5ee",
     "playwright": "^1.61.1"
   },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "nexusengine": "0.0.4"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "nexusengine": {
+      "optional": true
+    }
+  },
   "overrides": {
     "@hono/node-server": "2.0.11"
   }
