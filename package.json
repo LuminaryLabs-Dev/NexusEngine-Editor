@@ -10,9 +10,9 @@
   },
   "nexusEngineArtifact": {
     "version": "0.0.4",
-    "commit": "100af375f31b13d3c8c16c633ede6e76f465672f",
-    "registryHash": "sha256:0ddb768ad5bc0a015bdaefa33227e7901c42c192d5f129963270b5dbf1a2d8cd",
-    "tarballSha256": "80dc749820068281fe918b67a9470b6ea0d8da825d1ccaac67270e734ae73c87"
+    "commit": "58fa721db73992d77d6866b282494a559f0ec13c",
+    "registryHash": "sha256:8d65c7d6589811bdb9a56b80021095b16c1b8ce91bac4b488698132179c7f359",
+    "tarballSha256": "2111573c4c03a37ae6f8690e65452a820db16540b2e5f35fc868b2ecf3e9e15e"
   },
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#100af375f31b13d3c8c16c633ede6e76f465672f",
+    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#58fa721db73992d77d6866b282494a559f0ec13c",
     "playwright": "^1.61.1"
   },
   "peerDependencies": {
