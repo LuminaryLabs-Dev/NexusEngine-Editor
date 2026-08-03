@@ -1,0 +1,88 @@
+{
+  "generatedAt": "2026-08-01T18:27:09.615186+00:00",
+  "project": "NexusEngine Editor",
+  "schemaVersion": "repo-image-pack.v1",
+  "settings": {
+    "backgroundColor": "#071B2D",
+    "coverResizeMode": "contain-pad-no-crop",
+    "edgeContract": 1,
+    "keyColor": "#FF00FF",
+    "logoPosition": "top-center",
+    "logoSize": 140,
+    "opaqueThreshold": 220.0,
+    "primaryColor": "#25C5E8",
+    "sourceMode": "chroma",
+    "transparentThreshold": 12.0
+  },
+  "sha256": {
+    "cover-1280x640.png": "3460e7d93bbc1582983ebb0632b4efced7d3ca40cdad748b7b5456b6b11c15eb",
+    "cover-source.png": "4c8ecc73bc00ba40c83bd69388b352e32bb0790d981ee21499ef2f0eb20e9a74",
+    "logo-1024.png": "df96ca027fd0e23a93f5e41b9d0b4eb7a6d74cbab10cbd6d30c540da8e2b65c6",
+    "logo-256.png": "a159eeff30a2cfbd2075833101be478080809aedf54e4d4b56b8815f9814ec45",
+    "logo-512.png": "10abddb557dde2c507b0a143146bbc45fb6cb15f60a64da69a56700ad40f02cc",
+    "logo-mask.png": "cc46f79925773873d2412ebc55f348fba2340280cdcb6479105dce41bd276c4c",
+    "logo-mask.svg": "1c57d05d905e532ee89f22b40c8727ba5659352753234e7132d0f508797c8f52",
+    "logo-source.png": "816fa47fa00072d888dd0930a49e4077bee28ca9a7baff29080290d851c25aa4",
+    "logo-transparent.png": "4767433918596ee16204bc925c6d21e0b9f55c30f54341bd6e09844a7087aa8b",
+    "social-card.png": "76573f3d3d12064102814d979b2a3e69b156ddf7a95fc933f0ff00c92732ace5"
+  },
+  "source": {
+    "coverFilename": "exec-89ce9cd9-53db-448a-90f3-0a315ea43445.png",
+    "coverSha256": "8de1df941306af06bcf02731f3d2d9aa668623e639d272d08b295d6dc3e3d5a3",
+    "logoFilename": "exec-a1c98dd9-0f61-4cef-936d-dab1db716784.png",
+    "logoSha256": "ad6fc3e5c5f9c4a49aae2df6bc93d1f582064d45d12c658bb22011578fb1c6fa"
+  },
+  "summary": "Viewport-first Domain and Kit composition with validated playable output.",
+  "tools": {
+    "chromaHelper": {
+      "name": "imagegen/remove_chroma_key.py",
+      "sha256": "3f7b9b14ad5c90f37618bc1c16a039a2076abca12ddc41b3ae470e2b1cad6c0e"
+    },
+    "ffmpeg": "ffmpeg version 8.0.1 Copyright (c) 2000-2025 the FFmpeg developers",
+    "ffprobe": "ffprobe version 8.0.1 Copyright (c) 2007-2025 the FFmpeg developers"
+  },
+  "validation": {
+    "dimensions": {
+      "cover-1280x640.png": [
+        1280,
+        640
+      ],
+      "logo-1024.png": [
+        1024,
+        1024
+      ],
+      "logo-256.png": [
+        256,
+        256
+      ],
+      "logo-512.png": [
+        512,
+        512
+      ],
+      "logo-mask.png": [
+        1254,
+        1254
+      ],
+      "logo-source.png": [
+        1254,
+        1254
+      ],
+      "logo-transparent.png": [
+        1254,
+        1254
+      ],
+      "social-card.png": [
+        1280,
+        640
+      ]
+    },
+    "maskCoverage": 0.256684,
+    "status": "pass",
+    "transparentCornerAlpha": [
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}

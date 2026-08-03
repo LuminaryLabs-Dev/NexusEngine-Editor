@@ -17,7 +17,7 @@ Status: active
 - NexusEngine owns registry truth, hierarchy validation, and dependency planning; the Editor owns draft editing, atomic Apply, and disposable previews.
 - Browser users may add existing registry references, but code/registry package installation remains CLI-only and imported JSON never authorizes executable code.
 - Browser runtimes use `kitMutationMode: "read-only"`; CLI runtimes opt into `kitMutationMode: "cli"` for install operations.
-- Project format `0.3.0` stores an accepted composition tree and project-local registry overlay. Flat `domainStack`, `kitConfigs`, and object `domainKits` remain derived compatibility projections.
+- Project format `0.4.0` stores an accepted composition tree and metadata-only Composition registry v3 project overlay. Flat `domainStack`, `kitConfigs`, and object `domainKits` remain derived compatibility projections.
 - Dirty or invalid drafts disable preview, Play, and Build. Failed Apply never changes the accepted tree.
 - Run Once is selection-aware and uses a fresh NexusEngine instance. Only trusted factories already exported by the loaded Engine may execute; optional simple preview commands require `editorSafe` and bounded async timeouts, otherwise one fixed tick runs. Imported manifest-only kits remain preview-unavailable.
 - Sequence Timeline links are manifest-driven: source kit, source event, target kit, and target output come from installed kit configs/manifests and export as `sequenceGraph`.
