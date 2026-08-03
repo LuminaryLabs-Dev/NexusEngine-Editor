@@ -41,7 +41,7 @@ import {
   validateEditorFeatureContracts
 } from "./kits/editor-feature-contracts-kit/index.js";
 
-export const NEXUS_ENGINE_COMMIT = "a68544434424438491be1398e3f3d5aced5bc5ee";
+export const NEXUS_ENGINE_COMMIT = "100af375f31b13d3c8c16c633ede6e76f465672f";
 export const NEXUS_ENGINE_CDN_URL = "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@" + NEXUS_ENGINE_COMMIT + "/src/index.js";
 const DEFAULT_PROJECT_STORAGE_KEY = "nexusengine-editor:project-snapshot";
 const VIEWPORT_TOOL_IDS = Object.freeze(["select", "move", "rotate", "scale", "pan"]);

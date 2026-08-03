@@ -22,7 +22,7 @@ Composer behavior:
 The editor targets the exact committed NexusEngine `0.0.4` source through jsDelivr:
 
 ```txt
-https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@a68544434424438491be1398e3f3d5aced5bc5ee/src/index.js
+https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@100af375f31b13d3c8c16c633ede6e76f465672f/src/index.js
 ```
 
 The runtime root and Composition semantic subpath are loaded separately. Factory resolution reads the package export map and imports only the exact canonical subpath recorded in the approved registry. Until the commit is pushed, the CDN request fails closed; local proof injects the packed Engine artifact from the same localhost origin:
