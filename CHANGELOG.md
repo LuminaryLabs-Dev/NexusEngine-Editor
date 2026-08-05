@@ -14,7 +14,7 @@ historical release dates or npm publication.
 - Opt-in editor/composition MCP tooling and an isolated example game MCP runtime.
 - Browser read-only kit mutation and explicit MCP write/action gates.
 - Editor-owned file-backed Headless host exported separately from Engine Core.
-- Exact NexusEngine `58fa721db73992d77d6866b282494a559f0ec13c` dependency and browser pin.
+- Exact NexusEngine `16aee598c06efcb7b511e4827ee3f7e23ce3549b` dependency and browser pin.
 - Manual-only GitHub Pages deployment through `workflow_dispatch`.
 
 ## Compatibility

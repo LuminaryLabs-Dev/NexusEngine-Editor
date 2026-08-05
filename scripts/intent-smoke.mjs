@@ -15,6 +15,13 @@ import { createNexusEngineEditorRuntime } from "../src/nexus-engine-editor-runti
 import { validateEditorFeatureContracts } from "../src/kits/editor-feature-contracts-kit/index.js";
 import { HEADLESS_EDITOR_STAGE_ORDER, createHeadlessEditorHarness } from "../src/headless/index.js";
 
+const packageManifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+const npmLockfile = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
+const engineCommit = packageManifest.nexusEngineArtifact.commit;
+const engineSource = `git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#${engineCommit}`;
+assert.equal(packageManifest.devDependencies.nexusengine, engineSource, "Engine development dependency must use exact-commit HTTPS");
+assert.equal(npmLockfile.packages["node_modules/nexusengine"].resolved, engineSource, "Engine lock must use exact-commit HTTPS");
+
 async function connectEditorMcp(projectPath, { allowWrites = false } = {}) {
   const client = new Client({ name: "nexusengine-editor-intent-smoke", version: "0.1.0" });
   const transport = new StdioClientTransport({
