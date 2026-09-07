@@ -1,0 +1,1227 @@
+{
+  "artifactHash": "f21f0a5d61527a0277144c462ce2e21f83911defc326aec3180ba969a4aa44f4",
+  "browser": "140.0.7339.16",
+  "provider": "Three GLTFLoader and WebGLRenderer",
+  "results": [
+    {
+      "name": "overall",
+      "view": {
+        "width": 1000,
+        "height": 800,
+        "camera": {
+          "position": [
+            5.8,
+            4.5,
+            7
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "yfov": 0.65
+        }
+      },
+      "statistics": {
+        "meshes": [
+          {
+            "name": "Bevelled_enamel_case_geometry",
+            "vertices": 180,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "blue-enamel",
+                "color": [
+                  1,
+                  1,
+                  1
+                ],
+                "roughness": 0.26,
+                "metalness": 0.35,
+                "baseTexture": true,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Machined_control_dial_geometry",
+            "vertices": 372,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Amber_indicator_geometry",
+            "vertices": 672,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "amber",
+                "color": [
+                  1,
+                  0.3,
+                  0.025
+                ],
+                "roughness": 0.18,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_1",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_2",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_3",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry_1",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          }
+        ],
+        "animations": [],
+        "bounds": [
+          2.9474612204003465,
+          1.79000000923872,
+          1.8780535527319866
+        ],
+        "renderer": {
+          "frame": 2,
+          "calls": 9,
+          "triangles": 544,
+          "points": 0,
+          "lines": 0
+        },
+        "memory": {
+          "geometries": 5,
+          "textures": 2
+        },
+        "camera": {
+          "position": [
+            5.799999999999999,
+            4.500000000000001,
+            7
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "yfov": 0.65
+        }
+      },
+      "imageHash": "dab2aa4aab2670c8141ba2ed0745a6d2066cd76e1640655fb29d17045bb3b187"
+    },
+    {
+      "name": "silhouette",
+      "view": {
+        "width": 1000,
+        "height": 650,
+        "camera": {
+          "position": [
+            6,
+            0.6,
+            7
+          ],
+          "target": [
+            0,
+            -0.12,
+            0
+          ],
+          "yfov": 0.55
+        }
+      },
+      "statistics": {
+        "meshes": [
+          {
+            "name": "Bevelled_enamel_case_geometry",
+            "vertices": 180,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "blue-enamel",
+                "color": [
+                  1,
+                  1,
+                  1
+                ],
+                "roughness": 0.26,
+                "metalness": 0.35,
+                "baseTexture": true,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Machined_control_dial_geometry",
+            "vertices": 372,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Amber_indicator_geometry",
+            "vertices": 672,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "amber",
+                "color": [
+                  1,
+                  0.3,
+                  0.025
+                ],
+                "roughness": 0.18,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_1",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_2",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_3",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry_1",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          }
+        ],
+        "animations": [],
+        "bounds": [
+          2.9474612204003465,
+          1.79000000923872,
+          1.8780535527319866
+        ],
+        "renderer": {
+          "frame": 2,
+          "calls": 9,
+          "triangles": 544,
+          "points": 0,
+          "lines": 0
+        },
+        "memory": {
+          "geometries": 5,
+          "textures": 2
+        },
+        "camera": {
+          "position": [
+            6,
+            0.6000000000000008,
+            7
+          ],
+          "target": [
+            0,
+            -0.12,
+            0
+          ],
+          "yfov": 0.55
+        }
+      },
+      "imageHash": "a259741fd4f92a70a903234c0e1835b0c3627b685a775eb7e66a89b34af14b07"
+    },
+    {
+      "name": "icing",
+      "view": {
+        "width": 1000,
+        "height": 800,
+        "camera": {
+          "position": [
+            3.2,
+            1.6,
+            4.2
+          ],
+          "target": [
+            0.25,
+            0.2,
+            0.6
+          ],
+          "yfov": 0.55
+        }
+      },
+      "statistics": {
+        "meshes": [
+          {
+            "name": "Bevelled_enamel_case_geometry",
+            "vertices": 180,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "blue-enamel",
+                "color": [
+                  1,
+                  1,
+                  1
+                ],
+                "roughness": 0.26,
+                "metalness": 0.35,
+                "baseTexture": true,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Machined_control_dial_geometry",
+            "vertices": 372,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Amber_indicator_geometry",
+            "vertices": 672,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "amber",
+                "color": [
+                  1,
+                  0.3,
+                  0.025
+                ],
+                "roughness": 0.18,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_1",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_2",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_3",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry_1",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          }
+        ],
+        "animations": [],
+        "bounds": [
+          2.9474612204003465,
+          1.79000000923872,
+          1.8780535527319866
+        ],
+        "renderer": {
+          "frame": 2,
+          "calls": 9,
+          "triangles": 544,
+          "points": 0,
+          "lines": 0
+        },
+        "memory": {
+          "geometries": 5,
+          "textures": 2
+        },
+        "camera": {
+          "position": [
+            3.1999999999999997,
+            1.6,
+            4.2
+          ],
+          "target": [
+            0.25,
+            0.2,
+            0.6
+          ],
+          "yfov": 0.55
+        }
+      },
+      "imageHash": "a77bfe5bfcbeee9aff2be437f2ab50517475e5b532ee91a0b2f41b53adacafd9"
+    },
+    {
+      "name": "material",
+      "view": {
+        "width": 1000,
+        "height": 800,
+        "camera": {
+          "position": [
+            -3.8,
+            3.4,
+            4.8
+          ],
+          "target": [
+            -0.3,
+            0.15,
+            0.35
+          ],
+          "yfov": 0.58
+        }
+      },
+      "statistics": {
+        "meshes": [
+          {
+            "name": "Bevelled_enamel_case_geometry",
+            "vertices": 180,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "blue-enamel",
+                "color": [
+                  1,
+                  1,
+                  1
+                ],
+                "roughness": 0.26,
+                "metalness": 0.35,
+                "baseTexture": true,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Machined_control_dial_geometry",
+            "vertices": 372,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Amber_indicator_geometry",
+            "vertices": 672,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "amber",
+                "color": [
+                  1,
+                  0.3,
+                  0.025
+                ],
+                "roughness": 0.18,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_1",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_2",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_3",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry_1",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          }
+        ],
+        "animations": [],
+        "bounds": [
+          2.9474612204003465,
+          1.79000000923872,
+          1.8780535527319866
+        ],
+        "renderer": {
+          "frame": 2,
+          "calls": 9,
+          "triangles": 544,
+          "points": 0,
+          "lines": 0
+        },
+        "memory": {
+          "geometries": 5,
+          "textures": 2
+        },
+        "camera": {
+          "position": [
+            -3.8000000000000003,
+            3.4,
+            4.8
+          ],
+          "target": [
+            -0.3,
+            0.15,
+            0.35000000000000003
+          ],
+          "yfov": 0.58
+        }
+      },
+      "imageHash": "08b7e92130742f0b06f0b3060b590450c1568fcda9781eec09e111702ccf5f5a"
+    },
+    {
+      "name": "exported-artifact",
+      "view": {
+        "width": 1000,
+        "height": 800,
+        "camera": {
+          "position": [
+            5.8,
+            4.5,
+            7
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "yfov": 0.65
+        }
+      },
+      "statistics": {
+        "meshes": [
+          {
+            "name": "Bevelled_enamel_case_geometry",
+            "vertices": 180,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "blue-enamel",
+                "color": [
+                  1,
+                  1,
+                  1
+                ],
+                "roughness": 0.26,
+                "metalness": 0.35,
+                "baseTexture": true,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Machined_control_dial_geometry",
+            "vertices": 372,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Amber_indicator_geometry",
+            "vertices": 672,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "amber",
+                "color": [
+                  1,
+                  0.3,
+                  0.025
+                ],
+                "roughness": 0.18,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_1",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_2",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Captive_fastener_geometry_3",
+            "vertices": 84,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "machined-metal",
+                "color": [
+                  0.53,
+                  0.58,
+                  0.62
+                ],
+                "roughness": 0.25,
+                "metalness": 0.92,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          },
+          {
+            "name": "Rubber_foot_geometry_1",
+            "vertices": 36,
+            "skinned": false,
+            "joints": 0,
+            "morphs": 0,
+            "materials": [
+              {
+                "name": "rubber",
+                "color": [
+                  0.025,
+                  0.03,
+                  0.035
+                ],
+                "roughness": 0.87,
+                "metalness": 0,
+                "baseTexture": false,
+                "normalTexture": false
+              }
+            ]
+          }
+        ],
+        "animations": [],
+        "bounds": [
+          2.9474612204003465,
+          1.79000000923872,
+          1.8780535527319866
+        ],
+        "renderer": {
+          "frame": 2,
+          "calls": 9,
+          "triangles": 544,
+          "points": 0,
+          "lines": 0
+        },
+        "memory": {
+          "geometries": 5,
+          "textures": 2
+        },
+        "camera": {
+          "position": [
+            5.799999999999999,
+            4.500000000000001,
+            7
+          ],
+          "target": [
+            0,
+            -0.05,
+            0
+          ],
+          "yfov": 0.65
+        }
+      },
+      "imageHash": "dab2aa4aab2670c8141ba2ed0745a6d2066cd76e1640655fb29d17045bb3b187"
+    }
+  ]
+}

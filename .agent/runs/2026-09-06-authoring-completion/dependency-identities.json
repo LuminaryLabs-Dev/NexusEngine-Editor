@@ -1,0 +1,15 @@
+{
+  "engine": {
+    "version": "0.0.4",
+    "commit": "a74e8689d1a71c0b42236c009f0f4c46e9b89387",
+    "registryHash": "sha256:d2b8af8d1d542bdb125d33b8a4ff5a32de1cf73da399e57e9a29b5ae35d4a8f5",
+    "tarballSha256": "5a7e2985fd1c67e1204490570e7ccf008eff742f157485bfa552881584b2883b"
+  },
+  "providers": {
+    "package": "@luminarylabs/nexusengine-kits",
+    "version": "0.0.1",
+    "commit": "a7abd1340d8f695abc8974121fdd2ef4112413c0",
+    "tarballSha256": "7998e910d00370872dee8ebf0c472b64df99f0f1644a87cdb65b103e3345e4f3",
+    "requiredByAuthoringHost": false
+  }
+}

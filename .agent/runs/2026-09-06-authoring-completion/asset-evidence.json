@@ -1,0 +1,53 @@
+[
+  {
+    "asset": "donut",
+    "recipe": {
+      "id": "donut/1",
+      "seed": 37,
+      "majorRadius": 1.55,
+      "minorRadius": 0.58,
+      "segments": 64,
+      "rings": 16,
+      "sprinkles": 180,
+      "textureResolution": 512
+    },
+    "sourceDocuments": 26,
+    "outputHash": "sha256:824f5f2db79deb727ac5da001d9d8df85991207563817a74047f3a13a7e58777",
+    "byteLength": 9524452,
+    "validation": {
+      "validator": "Khronos glTF Validator",
+      "version": "2.0.0-dev.3.10",
+      "errors": 0,
+      "warnings": 0
+    },
+    "textures": 4
+  },
+  {
+    "asset": "mechanical",
+    "recipe": "mechanical/1",
+    "sourceDocuments": 12,
+    "outputHash": "sha256:f21f0a5d61527a0277144c462ce2e21f83911defc326aec3180ba969a4aa44f4",
+    "byteLength": 168732,
+    "validation": {
+      "validator": "Khronos glTF Validator",
+      "version": "2.0.0-dev.3.10",
+      "errors": 0,
+      "warnings": 0
+    },
+    "textures": 1
+  },
+  {
+    "asset": "organic",
+    "recipe": "organic/1",
+    "sourceDocuments": null,
+    "outputHash": "sha256:8b40abf93dc9f9c9b41b0120bed916bad434f11a8e538652d624c601bb97b5ba",
+    "byteLength": 696732,
+    "validation": {
+      "validator": "Khronos glTF Validator",
+      "version": "2.0.0-dev.3.10",
+      "errors": 0,
+      "warnings": 1
+    },
+    "textures": 1
+  }
+]

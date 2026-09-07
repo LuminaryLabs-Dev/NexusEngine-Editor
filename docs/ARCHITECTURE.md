@@ -63,7 +63,7 @@ not inherited by normal exports.
 ## Compatibility Boundary
 
 Browser, CLI, MCP, and integration checks use NexusEngine `0.0.4` commit
-`58fa721db73992d77d6866b282494a559f0ec13c`. The browser imports that immutable
+`a74e8689d1a71c0b42236c009f0f4c46e9b89387`. The browser imports that immutable
 commit through jsDelivr or a same-origin exact package override. The lockfile
 uses the same commit and has no sibling checkout or symlink fallback.
 

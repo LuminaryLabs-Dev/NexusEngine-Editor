@@ -1,0 +1,53 @@
+{
+  "directory": "/tmp/nexus-authoring-consumer-nHQ1P4",
+  "packages": [
+    {
+      "file": "/tmp/nexus-authoring-candidates/engine-authoring-12.tgz",
+      "sha256": "5a7e2985fd1c67e1204490570e7ccf008eff742f157485bfa552881584b2883b"
+    },
+    {
+      "file": "/tmp/nexus-authoring-candidates/luminarylabs-nexusengine-kits-0.0.1.tgz",
+      "sha256": "36ce11e1114e037b56bf401ccfeefcd60619cc7def52ed89f681fcd29d598e3d"
+    },
+    {
+      "file": "/tmp/nexus-authoring-candidates/luminarylabs-nexusengine-editor-0.1.0.tgz",
+      "sha256": "05407f3cdb98450eaa27b751ce1460c684e455687c44c341fcbc48fc3fc62b89"
+    }
+  ],
+  "checks": [
+    {
+      "args": [
+        "public.mjs"
+      ],
+      "status": 0,
+      "stdout": "Authoring public surface: all 19 factory imports, domain/API ownership, repeated installation and immutable/mutable snapshot isolation passed.\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "node_modules/nexusengine/examples/authoring/first-edit.mjs"
+      ],
+      "status": 0,
+      "stdout": "Authoring first edit: installed source, preview, undo/redo and reload passed.\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "consumer.mjs"
+      ],
+      "status": 0,
+      "stdout": "{\"sourceHash\":\"sha256:7d19685bbee795fe6739023a7d226c549c0d08250d9b5b9f5a9f6a54164bb4e8\",\"outputHash\":\"sha256:54f8bef991e6a72d8de414fcbd2d101d34b1e31ae3fb92fcfa077e97bacc3580\",\"validation\":{\"validator\":\"Khronos glTF Validator\",\"version\":\"2.0.0-dev.3.10\",\"errors\":0,\"warnings\":0},\"publicProviders\":4,\"kitIds\":[\"authoring-domain-contract-kit\",\"authoring-project-document-kit\",\"authoring-mesh-document-kit\",\"authoring-editing-session-kit\",\"authoring-workspace-service-kit\",\"authoring-brush-service-kit\",\"authoring-sculpt-service-kit\",\"authoring-curve-service-kit\",\"authoring-uv-service-kit\",\"authoring-material-service-kit\",\"authoring-paint-service-kit\",\"authoring-rig-service-kit\",\"authoring-skin-service-kit\",\"authoring-animation-service-kit\",\"authoring-assembly-service-kit\",\"authoring-domain-composition-service-kit\",\"authoring-sequence-service-kit\",\"authoring-publishing-service-kit\",\"authoring-modifier-service-kit\"],\"browser\":\"140.0.7339.16\"}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "node_modules/@luminarylabs/nexusengine-editor/scripts/nexus-authoring.mjs",
+        "help"
+      ],
+      "status": 0,
+      "stdout": "Nexus Authoring\n\n  nexus-authoring create --project PATH\n  nexus-authoring open --project PATH [--port 0] [--assembly scene]\n  nexus-authoring stdio --project PATH\n  nexus-authoring run --project PATH --file OPERATIONS.json\n  nexus-authoring export --project PATH [--assembly scene] [--output PATH]\n\nThe selected directory contains project.json, content-addressed documents and\nblobs, checkpoints and a durable command journal. The local browser uses this\nsame real Engine host. JSON-line stdio exposes tools, execute, preview, save\nand close. Run accepts an array of operations or a complete project request.\n",
+      "stderr": ""
+    }
+  ],
+  "passed": true
+}

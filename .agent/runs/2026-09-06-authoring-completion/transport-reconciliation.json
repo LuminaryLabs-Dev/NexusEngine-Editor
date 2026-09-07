@@ -1,0 +1,8 @@
+{
+  "reason": "Terminal Git write credentials unavailable; authenticated GitHub object API used.",
+  "initialEngineCommit": "d9634de69d20ebb60008687231cee46cce10a021",
+  "githubEngineCommit": "a74e8689d1a71c0b42236c009f0f4c46e9b89387",
+  "identicalEngineTree": "4628b71fefb14b47e4f568b2165e4c194d4f9ebb",
+  "engineTarballUnchanged": true,
+  "previousExactLockEvidence": "Retained as historical evidence for the byte-identical Engine tree; current pins validated again."
+}

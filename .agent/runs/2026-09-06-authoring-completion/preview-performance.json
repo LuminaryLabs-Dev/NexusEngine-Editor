@@ -1,0 +1,556 @@
+{
+  "browser": "140.0.7339.16",
+  "renderer": "Three/WebGL SwiftShader",
+  "conditions": "Three fresh pages; repeated update uses the same artifact, OS/browser filesystem caches may be warm; shared development machine.",
+  "results": [
+    {
+      "profile": "mesh-10000",
+      "bytes": 4000368,
+      "repetitions": [
+        {
+          "loadMs": 191.40847199999962,
+          "updateMs": 36.30000001192093,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-10000_geometry",
+                "vertices": 58806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 19602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 194.297462,
+          "updateMs": 32.400000005960464,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-10000_geometry",
+                "vertices": 58806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 19602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 156.59851800000024,
+          "updateMs": 42.70000000298023,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-10000_geometry",
+                "vertices": 58806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 19602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        }
+      ]
+    },
+    {
+      "profile": "mesh-100000",
+      "bytes": 40516388,
+      "repetitions": [
+        {
+          "loadMs": 285.14094099999784,
+          "updateMs": 194,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-100000_geometry",
+                "vertices": 595806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 198602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 271.29003600000215,
+          "updateMs": 153.3999999910593,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-100000_geometry",
+                "vertices": 595806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 198602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 267.29729900000166,
+          "updateMs": 172.59999999403954,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "mesh-100000_geometry",
+                "vertices": 595806,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 1,
+                    "metalness": 1,
+                    "baseTexture": false,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              10,
+              0,
+              10
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 198602,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 1
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        }
+      ]
+    },
+    {
+      "profile": "image-4096",
+      "bytes": 76564,
+      "repetitions": [
+        {
+          "loadMs": 332.31983599999876,
+          "updateMs": 231.5,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "image-4096_geometry",
+                "vertices": 36,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "material",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 0.5,
+                    "metalness": 0,
+                    "baseTexture": true,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              2,
+              2,
+              2
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 12,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 2
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 313.6188519999996,
+          "updateMs": 169.69999998807907,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "image-4096_geometry",
+                "vertices": 36,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "material",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 0.5,
+                    "metalness": 0,
+                    "baseTexture": true,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              2,
+              2,
+              2
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 12,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 2
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        },
+        {
+          "loadMs": 289.8596319999997,
+          "updateMs": 200.29999999701977,
+          "statistics": {
+            "meshes": [
+              {
+                "name": "image-4096_geometry",
+                "vertices": 36,
+                "skinned": false,
+                "joints": 0,
+                "morphs": 0,
+                "materials": [
+                  {
+                    "name": "material",
+                    "color": [
+                      1,
+                      1,
+                      1
+                    ],
+                    "roughness": 0.5,
+                    "metalness": 0,
+                    "baseTexture": true,
+                    "normalTexture": false
+                  }
+                ]
+              }
+            ],
+            "animations": [],
+            "bounds": [
+              2,
+              2,
+              2
+            ],
+            "renderer": {
+              "frame": 3,
+              "calls": 1,
+              "triangles": 12,
+              "points": 0,
+              "lines": 0
+            },
+            "memory": {
+              "geometries": 1,
+              "textures": 2
+            },
+            "camera": {
+              "position": [
+                8,
+                8.000000000000002,
+                9.999999999999998
+              ],
+              "target": [
+                0,
+                0,
+                0
+              ],
+              "yfov": 0.7
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

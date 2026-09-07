@@ -1,0 +1,44 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 test
+> npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run build && npm run smoke:playwright
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 test:headless
+> node tests/headless-strict.mjs
+
+strict headless and development proof passed: stages, identity, evidence, failures, replay, stale source, limits
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 test:authoring
+> node tests/run-authoring.mjs
+
+Authoring host: real Engine ownership, edit/preview/history, durable journal recovery, retry preservation, writer conflicts and atomic checkpoint publication passed.
+{"test":"Authoring GLB","errors":0,"warnings":1,"messages":["NODE_MATRIX_DEFAULT","NODE_SKINNED_MESH_NON_ROOT"],"bytes":9508,"hash":"sha256:de8b4b7b836b87054969d5c4262ed6e8a61766edfe3430ba2059579c7138fb4e"}
+{"test":"Authoring actual GLB rendering","browser":"140.0.7339.16","coloredPixels":46290,"meshes":1,"renderer":{"frame":2,"calls":1,"triangles":12,"points":0,"lines":0},"causalTextureChange":true}
+Authoring Canvas client: create, instance selection, face edit, undo/redo, material, save, and GLB export passed.
+Authoring CLI: real Engine startup, tool discovery, durable edit, readback, save and clean shutdown passed.
+{"test":"Authoring background jobs","staleResultRejected":true,"cancellationMs":10.272320000000036,"restartedAfterTermination":true,"statistics":{"closed":true,"active":0,"queued":0,"completed":2,"failed":0,"cancelled":2,"inputBytes":170829,"resultBytes":72802}}
+Authoring browser storage: actual IndexedDB source roundtrip, competing-writer rejection and connection cleanup passed.
+{"test":"Independent Three GLB skin/morph deformation","maximumError":2.6878839810848853e-7,"maximumMovement":3.5167984290950645,"joints":4,"clips":3,"sourceVertices":780}
+{"test":"Authoring isolated batch generation","reports":[{"count":1,"completed":1,"cacheHits":1,"elapsedMs":87.35603300000002,"peakRSS":283549696},{"count":10,"completed":10,"cacheHits":10,"elapsedMs":293.373419,"peakRSS":295165952},{"count":100,"initial":{"completed":95,"failed":5},"resumed":{"completed":100,"cacheHits":95},"elapsedMs":2414.350194,"peakRSS":307933184,"diverseBounds":100}]}
+Passed 9 Authoring host, delivery, browser, worker and batch proofs.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 smoke:intent
+> node scripts/intent-smoke.mjs
+
+editor intent smoke passed
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 build
+> node scripts/build-static-site.mjs
+
+Built static editor at /workspace/scratch/52aac677ed4f/NexusEngine-Editor/dist
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> @luminarylabs/nexusengine-editor@0.1.0 smoke:playwright
+> node tests/playwright-editor-smoke.mjs
+
+editor playwright smoke passed

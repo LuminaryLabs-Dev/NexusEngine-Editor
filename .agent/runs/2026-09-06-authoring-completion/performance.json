@@ -1,0 +1,467 @@
+{
+  "environment": {
+    "cpu": "AMD EPYC 9V74 80-Core Processor",
+    "logicalCPUs": 9,
+    "reportedMemoryBytes": 23109910528,
+    "node": "v24.19.0",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "conditions": "Three fresh Node processes per workload; OS filesystem caches may remain warm. Shared development environment; other validation processes may contend for CPU. PeakRSS includes this process high-water mark, not the entire process tree.",
+  "results": [
+    {
+      "mode": "mesh",
+      "size": 10000,
+      "timings": {
+        "create": 549.666136,
+        "selection": 11.795161000000007,
+        "transform": 263.68344,
+        "undo": 103.90333600000008,
+        "redo": 95.056466,
+        "modifier": 230.26098500000012,
+        "sculpt": 717.9650080000001,
+        "save": 94.19503500000019,
+        "load": 60.284455999999864,
+        "prepare": 969.1381829999996,
+        "export": 87.6986939999997
+      },
+      "sourceBytes": 2273894,
+      "historyBytes": 11364310,
+      "outputBytes": 4000384,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 407408640,
+      "node": "v24.19.0",
+      "repetition": 0
+    },
+    {
+      "mode": "mesh",
+      "size": 10000,
+      "timings": {
+        "create": 603.0646959999999,
+        "selection": 8.529931000000033,
+        "transform": 284.4532919999999,
+        "undo": 116.47753399999988,
+        "redo": 113.57229700000016,
+        "modifier": 262.27054799999996,
+        "sculpt": 681.4666969999998,
+        "save": 141.12462400000004,
+        "load": 85.48549299999968,
+        "prepare": 992.321207,
+        "export": 116.69683500000019
+      },
+      "sourceBytes": 2273894,
+      "historyBytes": 11364310,
+      "outputBytes": 4000384,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 423223296,
+      "node": "v24.19.0",
+      "repetition": 1
+    },
+    {
+      "mode": "mesh",
+      "size": 10000,
+      "timings": {
+        "create": 644.0981489999999,
+        "selection": 4.873889999999847,
+        "transform": 276.31797299999994,
+        "undo": 104.11812999999984,
+        "redo": 100.43825199999992,
+        "modifier": 239.25386400000002,
+        "sculpt": 798.050551,
+        "save": 175.96261900000036,
+        "load": 90.47463299999981,
+        "prepare": 1006.869573,
+        "export": 104.09583599999996
+      },
+      "sourceBytes": 2273894,
+      "historyBytes": 11364310,
+      "outputBytes": 4000384,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 403472384,
+      "node": "v24.19.0",
+      "repetition": 2
+    },
+    {
+      "mode": "mesh",
+      "size": 100000,
+      "timings": {
+        "create": 6843.075764,
+        "selection": 45.004667000000154,
+        "transform": 3383.7775300000003,
+        "undo": 1095.697674000001,
+        "redo": 1064.8975119999996,
+        "modifier": 3279.644012999999,
+        "sculpt": 7410.829206,
+        "save": 815.7598010000002,
+        "load": 871.9946320000017,
+        "prepare": 13505.867917,
+        "export": 904.3090019999945
+      },
+      "sourceBytes": 23972130,
+      "historyBytes": 119853162,
+      "outputBytes": 40516400,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 1560829952,
+      "node": "v24.19.0",
+      "repetition": 0
+    },
+    {
+      "mode": "mesh",
+      "size": 100000,
+      "timings": {
+        "create": 7231.328841,
+        "selection": 35.90792799999963,
+        "transform": 3346.131735,
+        "undo": 1353.7588880000003,
+        "redo": 1223.21205,
+        "modifier": 3314.8642260000015,
+        "sculpt": 7446.153839000002,
+        "save": 830.7880409999998,
+        "load": 704.6961940000001,
+        "prepare": 12385.376334,
+        "export": 1054.466379999998
+      },
+      "sourceBytes": 23972130,
+      "historyBytes": 119853162,
+      "outputBytes": 40516400,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 1549807616,
+      "node": "v24.19.0",
+      "repetition": 1
+    },
+    {
+      "mode": "mesh",
+      "size": 100000,
+      "timings": {
+        "create": 7009.052458,
+        "selection": 37.81329000000005,
+        "transform": 3480.0002749999994,
+        "undo": 1243.4302909999988,
+        "redo": 1517.6923989999996,
+        "modifier": 3468.532631,
+        "sculpt": 7581.288436999999,
+        "save": 867.1674879999991,
+        "load": 839.2494740000002,
+        "prepare": 12618.949783000004,
+        "export": 966.6945389999964
+      },
+      "sourceBytes": 23972130,
+      "historyBytes": 119853162,
+      "outputBytes": 40516400,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 0,
+        "resultBytes": 0
+      },
+      "peakRSS": 1795190784,
+      "node": "v24.19.0",
+      "repetition": 2
+    },
+    {
+      "mode": "image",
+      "size": 1024,
+      "timings": {
+        "bakeWorker": 4114.974724,
+        "paintTile": 364.27613699999984,
+        "save": 236.27768399999968,
+        "load": 103.36711399999967,
+        "prepare": 1679.8533589999997,
+        "export": 229.30986699999994
+      },
+      "sourceBytes": 8395384,
+      "historyBytes": 25181682,
+      "outputBytes": 577208,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 8416491
+      },
+      "peakRSS": 442306560,
+      "node": "v24.19.0",
+      "repetition": 0
+    },
+    {
+      "mode": "image",
+      "size": 1024,
+      "timings": {
+        "bakeWorker": 3634.716684,
+        "paintTile": 390.2499120000002,
+        "save": 207.6168319999997,
+        "load": 89.1626409999999,
+        "prepare": 1626.37684,
+        "export": 230.48465699999997
+      },
+      "sourceBytes": 8395384,
+      "historyBytes": 25181682,
+      "outputBytes": 577208,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 8416491
+      },
+      "peakRSS": 455888896,
+      "node": "v24.19.0",
+      "repetition": 1
+    },
+    {
+      "mode": "image",
+      "size": 1024,
+      "timings": {
+        "bakeWorker": 3890.1839769999997,
+        "paintTile": 360.8293300000005,
+        "save": 242.05851099999927,
+        "load": 107.86384300000009,
+        "prepare": 1688.2428149999996,
+        "export": 239.74720999999954
+      },
+      "sourceBytes": 8395384,
+      "historyBytes": 25181682,
+      "outputBytes": 577208,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 8416491
+      },
+      "peakRSS": 443944960,
+      "node": "v24.19.0",
+      "repetition": 2
+    },
+    {
+      "mode": "image",
+      "size": 2048,
+      "timings": {
+        "bakeWorker": 13343.986805,
+        "paintTile": 1451.7770330000003,
+        "save": 403.28935900000033,
+        "load": 444.8544689999999,
+        "prepare": 6740.350607,
+        "export": 832.2190580000024
+      },
+      "sourceBytes": 33569336,
+      "historyBytes": 100703538,
+      "outputBytes": 1678368,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 33667371
+      },
+      "peakRSS": 719491072,
+      "node": "v24.19.0",
+      "repetition": 0
+    },
+    {
+      "mode": "image",
+      "size": 2048,
+      "timings": {
+        "bakeWorker": 13097.603199,
+        "paintTile": 1548.6669010000005,
+        "save": 385.90113799999926,
+        "load": 463.27588299999843,
+        "prepare": 6923.224531000002,
+        "export": 880.1993240000011
+      },
+      "sourceBytes": 33569336,
+      "historyBytes": 100703538,
+      "outputBytes": 1678368,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 33667371
+      },
+      "peakRSS": 722558976,
+      "node": "v24.19.0",
+      "repetition": 1
+    },
+    {
+      "mode": "image",
+      "size": 2048,
+      "timings": {
+        "bakeWorker": 13303.283395,
+        "paintTile": 1621.7450819999995,
+        "save": 473.90230299999894,
+        "load": 513.8403660000004,
+        "prepare": 6721.614611000001,
+        "export": 811.6925760000013
+      },
+      "sourceBytes": 33569336,
+      "historyBytes": 100703538,
+      "outputBytes": 1678368,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 33667371
+      },
+      "peakRSS": 726228992,
+      "node": "v24.19.0",
+      "repetition": 2
+    },
+    {
+      "mode": "image",
+      "size": 4096,
+      "timings": {
+        "bakeWorker": 52527.383149,
+        "paintTile": 6260.320911999996,
+        "save": 1712.188298999994,
+        "load": 2029.3396999999968,
+        "prepare": 28440.196466,
+        "export": 3382.1778579999955
+      },
+      "sourceBytes": 134265784,
+      "historyBytes": 402792882,
+      "outputBytes": 4885948,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 134672811
+      },
+      "peakRSS": 1960132608,
+      "node": "v24.19.0",
+      "repetition": 0
+    },
+    {
+      "mode": "image",
+      "size": 4096,
+      "timings": {
+        "bakeWorker": 51190.061666,
+        "paintTile": 6210.5307579999935,
+        "save": 1515.0538500000039,
+        "load": 1898.2612169999993,
+        "prepare": 28273.564532000004,
+        "export": 3253.006647999995
+      },
+      "sourceBytes": 134265784,
+      "historyBytes": 402792882,
+      "outputBytes": 4885948,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 134672811
+      },
+      "peakRSS": 1965367296,
+      "node": "v24.19.0",
+      "repetition": 1
+    },
+    {
+      "mode": "image",
+      "size": 4096,
+      "timings": {
+        "bakeWorker": 53273.433261000006,
+        "paintTile": 5750.545621000005,
+        "save": 1483.7089780000024,
+        "load": 1697.2155560000028,
+        "prepare": 25812.621773000006,
+        "export": 3213.1532010000083
+      },
+      "sourceBytes": 134265784,
+      "historyBytes": 402792882,
+      "outputBytes": 4885948,
+      "worker": {
+        "closed": false,
+        "active": 0,
+        "queued": 0,
+        "completed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "inputBytes": 11182,
+        "resultBytes": 134672811
+      },
+      "peakRSS": 1964351488,
+      "node": "v24.19.0",
+      "repetition": 2
+    }
+  ],
+  "unsupported": {
+    "meshVertices": 1000000,
+    "imageResolution": 8192
+  }
+}

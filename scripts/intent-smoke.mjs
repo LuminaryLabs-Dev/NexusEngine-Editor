@@ -19,7 +19,8 @@ const packageManifest = JSON.parse(readFileSync(new URL("../package.json", impor
 const npmLockfile = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
 const engineCommit = packageManifest.nexusEngineArtifact.commit;
 const engineSource = `git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#${engineCommit}`;
-assert.equal(packageManifest.devDependencies.nexusengine, engineSource, "Engine development dependency must use exact-commit HTTPS");
+assert.equal(packageManifest.dependencies.nexusengine, engineSource, "Required Engine runtime dependency must use exact-commit HTTPS");
+assert.equal(packageManifest.peerDependenciesMeta?.nexusengine?.optional, undefined, "Authoring must require its Engine runtime");
 assert.equal(npmLockfile.packages["node_modules/nexusengine"].resolved, engineSource, "Engine lock must use exact-commit HTTPS");
 
 async function connectEditorMcp(projectPath, { allowWrites = false } = {}) {

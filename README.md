@@ -13,6 +13,9 @@ Project format `0.4.0` stores an accepted
 derived from that accepted tree for templates, CLI commands, snapshots, and
 exports.
 
+For editable meshes, materials, rigs, animation and GLB output, start with
+[Authoring](./AUTHORING.md). This uses the required Engine runtime in a local host.
+
 ## What It Provides
 
 - A native WebGL viewport kept primary across desktop and compact layouts.
@@ -30,13 +33,13 @@ The browser and Node toolchain target the same exact NexusEngine `0.0.4`
 candidate:
 
 ```txt
-58fa721db73992d77d6866b282494a559f0ec13c
+a74e8689d1a71c0b42236c009f0f4c46e9b89387
 ```
 
 The browser module URL is immutable:
 
 ```txt
-https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@58fa721db73992d77d6866b282494a559f0ec13c/src/index.js
+https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@a74e8689d1a71c0b42236c009f0f4c46e9b89387/src/index.js
 ```
 
 Until that commit is pushed, the CDN request fails closed. Local proof injects

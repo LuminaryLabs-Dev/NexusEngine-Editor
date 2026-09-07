@@ -27,7 +27,7 @@ Conventions:
 - The left panel is a registry-reference hierarchy of domains, subdomains, and leaf kits. The right panel configures the selected composition node, object, or sequence step; the bottom panel sequences and links kit events.
 - NexusEngine owns registry truth, complete-tree validation, and dependency planning. The Editor owns draft state, staged settings, atomic Apply, selection-aware disposable previews, and visual receipts.
 - Browser users may safely add already-registered domain/kit references. Installing code or registry packages remains CLI-only and imported JSON never grants executable trust.
-- The browser editor targets NexusEngine commit `16aee598c06efcb7b511e4827ee3f7e23ce3549b`, loads the root and Composition semantic module separately, and resolves executable factories only through canonical package exports. A failed immutable import does not grant a project registry executable trust.
+- The browser editor targets NexusEngine commit `a74e8689d1a71c0b42236c009f0f4c46e9b89387`, loads the root and Composition semantic module separately, and resolves executable factories only through canonical package exports. A failed immutable import does not grant a project registry executable trust.
 - Every required editor capability should be represented in `editor-feature-contracts-kit` and exported through `featureContracts` plus `featureContractValidation` in generated game manifests.
 - Browser runtimes use `kitMutationMode: "read-only"` and reject code/registry installation; CLI contexts explicitly opt into `kitMutationMode: "cli"` for `install-kit` operations.
 - Game templates that install kits are also CLI-only in browser runtimes; the browser may show the selected template and command, but only the CLI may apply kit-mutating templates.
@@ -65,7 +65,7 @@ Conventions:
 - CLI convenience commands include `target-clicker-game` for repeatable target-clicker project and HTML export proof.
 - Playable projects export through the CLI/MCP `playable-export` path as an exact local game folder, not through the generic manifest diagnostics builder. The exporter requires a new or empty destination outside the source tree, rejects symlinks, excludes authoring-only evidence/project files, and fingerprints the project, contract, and copied runtime.
 - Screenshot and Composition automation are owned by `scripts/nexus-engine-editor-screenshot-mcp.mjs`; it installs the optional MCP and Composition Kits and uses `src/adapters/node-mcp-sdk-adapter.js` for the official SDK stdio transport. It exposes seven Editor tools plus the twelve Composition tools; file-writing tools and `composition_apply` fail closed unless `NEXUS_EDITOR_MCP_ALLOW_WRITES=1`.
-- The Engine dependency is pinned to commit `16aee598c06efcb7b511e4827ee3f7e23ce3549b`; `package.json` also records registry and packed-artifact hashes. Validation uses the exact installed tarball, never a sibling source import or symlink.
+- The Engine dependency is pinned to commit `a74e8689d1a71c0b42236c009f0f4c46e9b89387`; `package.json` also records registry and packed-artifact hashes. Validation uses the exact installed tarball, never a sibling source import or symlink.
 - GitHub Pages deployment is manual-only through `workflow_dispatch`; source pushes run no publishing path.
 - `composition_apply` validates and stages the full accepted tree through the existing Editor controller. Stable plan IDs, executable fingerprints, and exactly-once receipts persist in `project.compositionApplyState`; replay after process restart returns the original receipt and conflicting Kit contents fail before mutation.
 - MCP `editor_project_status` delegates to the authoritative CLI, and `editor_playable_export` delegates to the same exact-game export before launching the standalone result for title-state proof. CLI and MCP therefore normalize the same accepted project rather than maintaining parallel project models.
@@ -79,3 +79,6 @@ Conventions:
 - Keep advanced controls behind the File menu, inspector foldouts, or collapsed Timeline. The first screen exposes only Add, Apply, Run Once, Play/Stop, status, the hierarchy, viewport, and selected-node settings.
 - Do not commit `dist/` or `node_modules/`.
 - Keep Playwright reports, traces, videos, and diagnostics out of the repo.
+
+- Authoring starts a required real Engine runtime through `src/authoring/host.js`; all typed source writes belong to Core Project. Canvas controls and Three/PNG/filesystem/worker adapters remain outside Core. The host consumes its own resource journal without simulation ticks.
+- Authoring filesystem checkpoints share content-addressed document versions across source/history and hash-chain acknowledged journal requests. The separate IndexedDB profile requires explicit saves.

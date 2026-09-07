@@ -1,0 +1,15 @@
+{
+  "method": "Clean npm ci from declared exact HTTPS lock; prepublication Git retrieval mapped only this Engine URL to its local committed repository. Every installed package file compared with packed commit A.",
+  "results": [
+    {
+      "consumer": "NexusEngine-Kits",
+      "matchedFiles": 1886,
+      "gitCommit": "d9634de69d20ebb60008687231cee46cce10a021"
+    },
+    {
+      "consumer": "NexusEngine-Editor",
+      "matchedFiles": 1886,
+      "gitCommit": "d9634de69d20ebb60008687231cee46cce10a021"
+    }
+  ]
+}

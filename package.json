@@ -6,13 +6,18 @@
   "description": "Static NexusEngine web editor shell for building DSK-driven games as HTML files.",
   "exports": {
     "./headless": "./src/headless/index.js",
-    "./adapters/node-mcp-sdk": "./src/adapters/node-mcp-sdk-adapter.js"
+    "./adapters/node-mcp-sdk": "./src/adapters/node-mcp-sdk-adapter.js",
+    "./headless/strict": "./src/headless/strict.js",
+    "./headless/development": "./src/headless/development.js",
+    "./authoring": "./src/authoring/index.js",
+    "./authoring/storage/browser": "./src/authoring/storage/browser-project.js",
+    "./authoring/preview": "./src/authoring/preview/localhost-server.js"
   },
   "nexusEngineArtifact": {
     "version": "0.0.4",
-    "commit": "16aee598c06efcb7b511e4827ee3f7e23ce3549b",
-    "registryHash": "sha256:740e0916c8017e4e2a91be79c7b02359c4fa1186d7174a52d6311ec8563cb3af",
-    "tarballSha256": "6ffc795737846027fb0426791e77ed77faed90917d25954ffde5d45154eee424"
+    "commit": "a74e8689d1a71c0b42236c009f0f4c46e9b89387",
+    "registryHash": "sha256:d2b8af8d1d542bdb125d33b8a4ff5a32de1cf73da399e57e9a29b5ae35d4a8f5",
+    "tarballSha256": "5a7e2985fd1c67e1204490570e7ccf008eff742f157485bfa552881584b2883b"
   },
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
@@ -25,26 +30,42 @@
     "mcp:game": "node examples/mcp-game-runtime.mjs",
     "smoke:intent": "node scripts/intent-smoke.mjs",
     "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
-    "test": "npm run smoke:intent && npm run build && npm run smoke:playwright"
+    "test": "npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run build && npm run smoke:playwright",
+    "test:headless": "node tests/headless-strict.mjs",
+    "authoring": "node scripts/nexus-authoring.mjs",
+    "test:authoring": "node tests/run-authoring.mjs",
+    "benchmark:authoring": "node benchmarks/authoring.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#16aee598c06efcb7b511e4827ee3f7e23ce3549b",
     "playwright": "^1.61.1"
   },
   "peerDependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "nexusengine": "0.0.4"
+    "@modelcontextprotocol/sdk": "^1.29.0"
   },
   "peerDependenciesMeta": {
     "@modelcontextprotocol/sdk": {
-      "optional": true
-    },
-    "nexusengine": {
       "optional": true
     }
   },
   "overrides": {
     "@hono/node-server": "2.0.11"
+  },
+  "dependencies": {
+    "esbuild": "0.25.10",
+    "gltf-validator": "2.0.0-dev.3.10",
+    "pngjs": "7.0.0",
+    "three": "0.180.0",
+    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#a74e8689d1a71c0b42236c009f0f4c46e9b89387"
+  },
+  "bin": {
+    "nexus-authoring": "./scripts/nexus-authoring.mjs"
+  },
+  "nexusProviderArtifact": {
+    "package": "@luminarylabs/nexusengine-kits",
+    "version": "0.0.1",
+    "commit": "a7abd1340d8f695abc8974121fdd2ef4112413c0",
+    "tarballSha256": "7998e910d00370872dee8ebf0c472b64df99f0f1644a87cdb65b103e3345e4f3",
+    "requiredByAuthoringHost": false
   }
 }

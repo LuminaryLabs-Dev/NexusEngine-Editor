@@ -23,3 +23,10 @@ historical release dates or npm publication.
 - Legacy flat project data is retained through derived compatibility projections.
 
 No GitHub release tags or formal release chronology are currently published.
+
+## Authoring integration
+
+- Added the required real Engine Authoring host, source transactions, journal/checkpoint recovery and default local CLI.
+- Added Canvas controls and an independent Three viewport, worker jobs, GLB/PNG delivery with Khronos validation, reproducible donut/mechanical/organic recipes and bounded batch recovery.
+- Added strict nine-stage development evidence adapters, integrated browser and command tests, and representative workload benchmarks.
+- Documented supported profiles in `AUTHORING.md`; legacy project format and static Editor remain available.

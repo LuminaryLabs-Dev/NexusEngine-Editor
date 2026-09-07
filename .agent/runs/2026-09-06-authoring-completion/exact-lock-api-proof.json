@@ -1,0 +1,15 @@
+{
+  "method": "Fresh npm ci from exact HTTPS Git lock, without a local URL mapping; installed source compared byte-for-byte with the tested Engine pack.",
+  "engineCommit": "a74e8689d1a71c0b42236c009f0f4c46e9b89387",
+  "tree": "4628b71fefb14b47e4f568b2165e4c194d4f9ebb",
+  "results": [
+    {
+      "consumer": "NexusEngine-Kits",
+      "matchedFiles": 1886
+    },
+    {
+      "consumer": "NexusEngine-Editor",
+      "matchedFiles": 1886
+    }
+  ]
+}

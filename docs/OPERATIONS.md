@@ -57,7 +57,7 @@ The game MCP example is isolated from normal editor output and requires
 ## Browser Compatibility
 
 The browser, CLI, MCP, and tests use NexusEngine `0.0.4` commit
-`58fa721db73992d77d6866b282494a559f0ec13c`. Local integration may use the
+`a74e8689d1a71c0b42236c009f0f4c46e9b89387`. Local integration may use the
 same-origin `?engine=` override, but it must resolve the exact installed package
 and never a sibling checkout or symlink.
 
