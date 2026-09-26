@@ -4,14 +4,28 @@ import {
   createAuthoringDomain,
   authoringDomainManifest,
 } from "nexusengine/domains/authoring";
+import {
+  createEditorExportServiceKit,
+  createGLBExportProvider,
+  createUSDZExportProvider,
+  createFBXExportProvider,
+} from "../editor/export/index.js";
 export function createAuthoringRuntime({
   projectId = "project",
   maxHistory = 128,
   maxReceipts = 10000,
 } = {}) {
-  const kits = createAuthoringDomain({
+  const authoringKits = createAuthoringDomain({
       project: { projectId, maxHistory, maxReceipts },
     }),
+    exportKit = createEditorExportServiceKit({
+      providers: [
+        createGLBExportProvider(),
+        createUSDZExportProvider(),
+        createFBXExportProvider(),
+      ],
+    }),
+    kits = [...authoringKits, exportKit],
     engine = createEngine({ kits });
   const owners = new Map(engine.n.apis().map((api) => [api.apiName, api]));
   for (const manifest of authoringDomainManifest.publicKits) {
@@ -46,6 +60,7 @@ export function createAuthoringRuntime({
       runtime: "nexusengine",
       version: NEXUS_ENGINE_VERSION,
       authoringSchema: engine.n.authoring.getContract().schema,
+      exportFormats: engine.n.editorExport.formats().map((entry) => entry.format),
     }),
     dispose() {
       engine.n.authoringSequence.dispose();

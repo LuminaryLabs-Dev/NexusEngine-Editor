@@ -29,7 +29,10 @@ const exchange = async (message) => {
 const timeout = setTimeout(() => child.kill("SIGKILL"), 15000);
 try {
   const status = await exchange({ id: "status", method: "status" });
-  assert.equal(status.kitIds.length, 19);
+  assert.equal(status.kitIds.length, 20);
+  assert.ok(status.kitIds.includes("editor-export-service-kit"));
+  const formats = await exchange({ id: "formats", method: "export-formats" });
+  assert.deepEqual(formats.map((entry) => entry.format), ["fbx", "glb", "usdz"]);
   const tools = await exchange({ id: "tools", method: "tools" });
   assert.ok(JSON.stringify(tools).includes("mesh.cube"));
   await exchange({
@@ -53,7 +56,7 @@ try {
   const code = await new Promise((resolve) => child.on("close", resolve));
   assert.equal(code, 0, stderr);
   console.log(
-    "Authoring CLI: real Engine startup, tool discovery, durable edit, readback, save and clean shutdown passed.",
+    "Authoring CLI: real Engine startup, export-provider discovery, durable edit, readback, save and clean shutdown passed.",
   );
 } finally {
   clearTimeout(timeout);

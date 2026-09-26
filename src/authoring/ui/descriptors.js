@@ -15,6 +15,8 @@ export function installAuthoringPanel(host) {
       { id: "redo", label: "Redo" },
       { id: "save", label: "Save" },
       { id: "export", label: "Export GLB" },
+      { id: "export-usdz", label: "USDZ" },
+      { id: "export-fbx", label: "FBX" },
       { id: "command", label: "Command" },
     ],
     inspector: [

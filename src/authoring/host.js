@@ -266,6 +266,41 @@ export async function createAuthoringHost({
       assertReady();
       return runtime.engine.n.authoringPublishing.prepare(profile);
     },
+    exportFormats() {
+      assertReady();
+      return runtime.engine.n.editorExport.formats();
+    },
+    inspectExport({ assemblyId = "scene", format = "glb", profile = {} } = {}) {
+      assertReady();
+      const packet = runtime.engine.n.authoringPublishing.prepare({
+        assemblyId,
+        ...profile,
+      });
+      return runtime.engine.n.editorExport.inspect({ packet, format });
+    },
+    exportArtifact({
+      assemblyId = "scene",
+      format = "glb",
+      outputDirectory,
+      profile = {},
+      signal,
+      onProgress = () => {},
+    } = {}) {
+      assertReady();
+      const packet = runtime.engine.n.authoringPublishing.prepare({
+        assemblyId,
+        ...profile,
+      });
+      return runtime.engine.n.editorExport.export(
+        { packet, format, outputDirectory },
+        {
+          signal,
+          onProgress,
+          jobs,
+          commitGuard: (action) => api.finalize(packet, action),
+        },
+      );
+    },
     async close({ save = false } = {}) {
       if (state === "closed") return { closed: true };
       if (state === "closing")

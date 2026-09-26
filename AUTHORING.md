@@ -34,12 +34,14 @@ opening a legacy project does not silently convert it.
 ```sh
 npm run authoring -- stdio --project /absolute/path/to/project
 npm run authoring -- run --project /absolute/path/to/project --file /absolute/path/to/operations.json
-npm run authoring -- export --project /absolute/path/to/project --assembly scene --output /absolute/path/to/output
+npm run authoring -- export --project /absolute/path/to/project --assembly scene --format glb --output /absolute/path/to/output
+npm run authoring -- export --project /absolute/path/to/project --assembly scene --format usdz --output /absolute/path/to/output
+npm run authoring -- export --project /absolute/path/to/project --assembly scene --format fbx --output /absolute/path/to/output
 ```
 
 Stdio accepts one JSON request per line and returns one response with the matching
 ID. Methods are `status`, `tools`, `list`, `read`, `execute`, `preview`, `accept`,
-`undo`, `redo`, `save`, `prepare` and `close`. Errors contain a stable code, message
+`undo`, `redo`, `save`, `prepare`, `export-formats`, `inspect-export`, `export` and `close`. Errors contain a stable code, message
 and details. Example execute frame (replace the epoch with current status):
 
 ```json
@@ -55,7 +57,7 @@ budget is 32 MiB and the serialized host queue holds at most 64 actions.
 
 ```js
 import {
-  createAuthoringHost, createFileProjectStore, publishAuthoringGLB,
+  createAuthoringHost, createFileProjectStore,
 } from '@luminarylabs/nexusengine-editor/authoring';
 
 const host = await createAuthoringHost({
@@ -63,10 +65,11 @@ const host = await createAuthoringHost({
 });
 try {
   console.log(host.tools());
-  const packet = host.prepare({ assemblyId: 'scene' });
-  await publishAuthoringGLB(packet, '/absolute/path/to/output', {
-    jobs: host.jobs,
-    commitGuard: action => host.finalize(packet, action),
+  console.log(host.exportFormats());
+  await host.exportArtifact({
+    assemblyId: 'scene',
+    format: 'usdz',
+    outputDirectory: '/absolute/path/to/output',
   });
 } finally {
   await host.close({ save: true });
@@ -121,17 +124,24 @@ termination. Derived results commit only if every captured source revision and
 hash still matches. Large derived images use a checkpoint instead of an oversized
 journal record. The largest supported bake is 4096×4096 RGBA8.
 
-Publishing emits an immutable directory containing `scene.glb`, standalone PNGs,
+Publishing is owned by the `n:editor:export` Domain Service Kit. It consumes the
+format-neutral Authoring delivery packet, selects an installed provider, validates
+the encoded artifact and atomically publishes a content-addressed directory with
 `provenance.json` and `validation.json`. Source hashes/revisions are checked again
-before atomic publication. Identical texture bytes share a standalone file.
-All five metallic-roughness PBR texture roles, hierarchy, skin joints/weights,
-animation clips, morph position/normal deltas, cameras and punctual lights use
-actual glTF binary data. Khronos validation runs before publication. Warnings
-remain in the report. Independent Three GLTFLoader rendering verifies the bytes.
+before commit.
 
-The format contract follows the [Khronos glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html).
-FBX and arbitrary Blender shader nodes are unsupported. Source documents remain
-the editable authority; exported triangles are delivery data.
+The GLB provider retains the full existing profile: metallic-roughness PBR textures,
+hierarchy, skin joints/weights, animation clips, morph position/normal deltas,
+cameras and punctual lights with Khronos validation. The USDZ and FBX providers
+currently expose explicit static-asset V1 profiles: evaluated meshes, hierarchy,
+transforms and scalar PBR material values. They fail closed for rigs/skins,
+animation, morphs, textures, cameras, lights, excluded-parent hierarchies and
+multi-material mesh instances rather than silently dropping authored data. USDZ
+writes aligned stored USDZ with USDA content; FBX writes deterministic FBX 7.4
+ASCII and reports the metallic-roughness approximation as a warning.
+
+Source documents remain the editable authority; exported triangles are delivery
+data. Additional formats can register providers without changing Authoring.
 
 ## Recipes, tests and measurements
 
@@ -149,7 +159,7 @@ and normal textures, and seeded surface-scattered sprinkles. Mechanical and
 organic fixtures exercise convex bevels, shared parts, rigs, weights, clips and
 shape keys. Renders inspect exported bytes, not independently recreated geometry.
 
-The nine integrated proof groups cover host recovery, GLB publication, causal
+The ten integrated proof groups cover host recovery, GLB publication, multi-format export, causal
 texture renders, UI edits/project switching, CLI, worker recovery, browser storage,
 independent skeletal/morph deformation and 1/10/100-job batch recovery. The
 benchmark runs three fresh processes each for 10k/100k vertices and 1K/2K/4K images;

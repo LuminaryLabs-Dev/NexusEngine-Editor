@@ -56,6 +56,15 @@ export async function routeAuthoringCommand(host, message) {
       case "prepare":
         result = host.prepare(p);
         break;
+      case "export-formats":
+        result = host.exportFormats();
+        break;
+      case "inspect-export":
+        result = host.inspectExport(p);
+        break;
+      case "export":
+        result = await host.exportArtifact(p);
+        break;
       case "close":
         result = await host.close(p);
         break;

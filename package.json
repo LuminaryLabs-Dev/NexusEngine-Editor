@@ -11,7 +11,8 @@
     "./headless/development": "./src/headless/development.js",
     "./authoring": "./src/authoring/index.js",
     "./authoring/storage/browser": "./src/authoring/storage/browser-project.js",
-    "./authoring/preview": "./src/authoring/preview/localhost-server.js"
+    "./authoring/preview": "./src/authoring/preview/localhost-server.js",
+    "./editor/export": "./src/editor/export/index.js"
   },
   "nexusEngineArtifact": {
     "version": "0.0.4",

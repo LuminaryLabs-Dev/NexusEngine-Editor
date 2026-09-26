@@ -208,10 +208,11 @@ async function dispatch(id) {
     await rpc(id, { requestId: uuid(), epoch: state.status.context.epoch });
     return { message: id === "undo" ? "Undone" : "Redone" };
   }
-  if (id === "export") {
-    const result = await rpc("export");
+  if (id === "export" || id.startsWith("export-")) {
+    const format = id === "export" ? "glb" : id.slice("export-".length),
+      result = await rpc("export", { format });
     return {
-      message: `Exported ${result.byteLength.toLocaleString()} bytes · ${result.validation.errors} validation errors`,
+      message: `Exported ${format.toUpperCase()} · ${result.byteLength.toLocaleString()} bytes · ${result.validation.errors} validation errors`,
     };
   }
   if (["translate", "rotate", "scale"].includes(id)) {
@@ -408,7 +409,7 @@ function draw() {
   );
   let x = 232;
   for (const action of state?.panel.toolbar ?? []) {
-    const w = action.id === "export" ? 94 : action.id === "command" ? 90 : 76;
+    const w = action.id === "export" ? 94 : action.id.startsWith("export-") ? 62 : action.id === "command" ? 90 : 76;
     button(action.id, action.label, x, 17, w);
     x += w + 6;
   }

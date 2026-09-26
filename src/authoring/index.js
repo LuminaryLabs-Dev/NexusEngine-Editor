@@ -11,3 +11,12 @@ export {
   evaluateAuthoringModifier,
   bakeAuthoringTexture,
 } from "./jobs/evaluate.js";
+
+export {
+  editorExportDomainManifest,
+  createEditorExportServiceKit,
+  createGLBExportProvider,
+  createUSDZExportProvider,
+  createFBXExportProvider,
+  publishEditorExportArtifact,
+} from "../editor/export/index.js";

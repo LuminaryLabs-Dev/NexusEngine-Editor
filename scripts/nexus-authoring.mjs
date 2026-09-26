@@ -6,13 +6,12 @@ import { createAuthoringHost } from "../src/authoring/host.js";
 import { createFileProjectStore } from "../src/authoring/storage/file-project.js";
 import { serveAuthoringStdio } from "../src/authoring/transports/stdio.js";
 import { startAuthoringPreview } from "../src/authoring/preview/localhost-server.js";
-import { publishAuthoringGLB } from "../src/authoring/export/publish.js";
 import { authoringErrorRecord } from "../src/authoring/command-router.js";
 const args = process.argv.slice(2),
   command = args.shift() ?? "help",
   options = {};
 function usage() {
-  return `Nexus Authoring\n\n  nexus-authoring create --project PATH\n  nexus-authoring open --project PATH [--port 0] [--assembly scene]\n  nexus-authoring stdio --project PATH\n  nexus-authoring run --project PATH --file OPERATIONS.json\n  nexus-authoring export --project PATH [--assembly scene] [--output PATH]\n\nThe selected directory contains project.json, content-addressed documents and\nblobs, checkpoints and a durable command journal. The local browser uses this\nsame real Engine host. JSON-line stdio exposes tools, execute, preview, save\nand close. Run accepts an array of operations or a complete project request.\n`;
+  return `Nexus Authoring\n\n  nexus-authoring create --project PATH\n  nexus-authoring open --project PATH [--port 0] [--assembly scene]\n  nexus-authoring stdio --project PATH\n  nexus-authoring run --project PATH --file OPERATIONS.json\n  nexus-authoring export --project PATH [--assembly scene] [--format glb|usdz|fbx] [--output PATH]\n\nThe selected directory contains project.json, content-addressed documents and\nblobs, checkpoints and a durable command journal. The local browser uses this\nsame real Engine host. JSON-line stdio exposes tools, execute, preview, save,\nexport discovery and export. Run accepts an array of operations or a complete\nproject request.\n`;
 }
 let host, server;
 try {
@@ -24,7 +23,7 @@ try {
     while (args.length) {
       const key = args.shift();
       if (
-        !["--project", "--port", "--assembly", "--file", "--output"].includes(
+        !["--project", "--port", "--assembly", "--file", "--output", "--format"].includes(
           key,
         ) ||
         !args.length ||
@@ -49,7 +48,8 @@ try {
     const output = options["--output"]
         ? resolve(options["--output"])
         : join(directory, "exports"),
-      assemblyId = options["--assembly"] ?? "scene";
+      assemblyId = options["--assembly"] ?? "scene",
+      format = options["--format"] ?? "glb";
     if (command === "create") {
       process.stdout.write(
         JSON.stringify({
@@ -81,11 +81,11 @@ try {
       await host.close();
     }
     if (command === "export") {
-      const packet = host.prepare({ assemblyId }),
-        result = await publishAuthoringGLB(packet, output, {
-          jobs: host.jobs,
-          commitGuard: (action) => host.finalize(packet, action),
-        });
+      const result = await host.exportArtifact({
+        assemblyId,
+        format,
+        outputDirectory: output,
+      });
       process.stdout.write(JSON.stringify({ ok: true, result }) + "\n");
       await host.close();
     }

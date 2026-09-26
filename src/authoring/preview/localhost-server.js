@@ -12,7 +12,6 @@ import {
   authoringErrorRecord,
 } from "../command-router.js";
 import { encodeAuthoringGLB } from "../export/glb.js";
-import { publishAuthoringGLB } from "../export/publish.js";
 import { createAuthoringView } from "./view.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 export async function startAuthoringPreview({
@@ -124,6 +123,7 @@ export async function startAuthoringPreview({
           status: host.status(),
           documents: host.list(),
           panel,
+          exportFormats: host.exportFormats(),
           workspace: host.list().some((d) => d.id === "workspace")
             ? host.read("workspace")
             : null,
@@ -194,11 +194,11 @@ export async function startAuthoringPreview({
               new Error("This preview has no export directory."),
               { code: "AUTHORING_EXPORT_DESTINATION" },
             );
-          const packet = host.prepare({ assemblyId }),
-            result = await publishAuthoringGLB(packet, outputDirectory, {
-              jobs: host.jobs,
-              commitGuard: (action) => host.finalize(packet, action),
-            });
+          const result = await host.exportArtifact({
+            assemblyId,
+            format: message.params?.format ?? "glb",
+            outputDirectory,
+          });
           json(response, { id: message.id, ok: true, result });
           return;
         }
