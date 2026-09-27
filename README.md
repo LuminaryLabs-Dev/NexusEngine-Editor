@@ -59,7 +59,13 @@ npm test
 npm run build
 ```
 
-The static site is written to `dist/`. Build the starter single-file game with:
+The static site is written to `dist/`. To promote the already-built static Editor into the repository root for branch-based GitHub Pages hosting, run:
+
+```bash
+npm run publish:root
+```
+
+This writes only generated public deployment entry files at the repository root (`index.html`, `editor.js`, `editor.css`, `.nojekyll`, and `deployment.json`). Source remains under `src/`. Build the starter single-file game separately with:
 
 ```bash
 npm run build:game
@@ -171,8 +177,10 @@ npm test
 ```
 
 The test command runs intent and MCP replay checks, the static build, and the
-Playwright Editor matrix. GitHub Pages deployment is manual-only through
-`workflow_dispatch`; source pushes do not publish the Editor.
+Playwright Editor matrix. GitHub Pages is configured to serve `main /(root)`.
+There is no Pages build workflow: build and validate the static Editor first,
+then run `npm run publish:root` and push the finished root artifact to `main`.
+GitHub only serves the committed files.
 
 ## License
 

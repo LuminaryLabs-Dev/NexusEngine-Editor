@@ -1,0 +1,9 @@
+{
+  "schema": "nexusengine-editor.deployment/1",
+  "deploymentMode": "branch-root-static",
+  "sourceParent": "0bd8acc9237513d992b136eaccc08cc47b27665b",
+  "coreCommit": "784e514722febf8fb09ca55a058b2736e93679bd",
+  "coreRegistry": "sha256:3b520f699299e0f8bc4fdab8a4b2297c823d94b22dbee30ee250d873e39cd30e",
+  "artifactFingerprint": "sha256:fafe1f4cc34de35528ff2e7728eaa235765a16463b9e4652f2e1869dc56ac4d6",
+  "entry": "index.html"
+}
