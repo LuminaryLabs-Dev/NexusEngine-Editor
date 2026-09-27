@@ -37,6 +37,11 @@ export async function startAuthoringPreview({ host, assemblyId = "scene", port =
       json(response,{status:host.status(),documents,assemblyId,assembly,view:createAuthoringView(view),validation:host.validateProject(),exportFormats:host.exportFormats(),importFormats:host.importFormats(),workbench:workbench.state()});return;
     }
     if(request.method==="GET"&&path==="/preview.glb"){const content=await preview();response.writeHead(200,{"Content-Type":"model/gltf-binary","Cache-Control":"no-store","X-Authoring-Source":content.packetHash,"X-Artifact-Hash":content.hash});response.end(content.bytes);return;}
+    if(request.method==="GET"&&path==="/runtime.glb"){
+      const content=await workbench.play.preview({format:"glb"});
+      response.writeHead(200,{"Content-Type":"model/gltf-binary","Cache-Control":"no-store","X-Runtime-Ticks":String(workbench.play.status().ticks),"X-Artifact-Hash":content.hash});
+      response.end(content.bytes);return;
+    }
     if(request.method==="POST"&&path==="/api"){
       const message=await receive(request);if(switching)throw Error("A project switch is already running.");
       if(["open-project","new-project"].includes(message.method)){
@@ -45,7 +50,7 @@ export async function startAuthoringPreview({ host, assemblyId = "scene", port =
       if(message.method==="export"){if(!outputDirectory)throw Object.assign(new Error("This preview has no export directory."),{code:"AUTHORING_EXPORT_DESTINATION"});const result=await host.exportArtifact({assemblyId,format:message.params?.format??"glb",outputDirectory});json(response,{id:message.id,ok:true,result:{...result,bytes:undefined,resources:undefined}});return;}
       if(message.method==="workbench-import-inspect"){const {base64,...params}=message.params??{};if(typeof base64!=="string")throw Error("Import bytes are required.");const result=await host.inspectImport({...params,bytes:Buffer.from(base64,"base64"),resources:{}});json(response,{id:message.id,ok:true,result});return;}
       if(message.method==="workbench-import-commit"){const result=await host.commitImport(message.params.plan);json(response,{id:message.id,ok:true,result});return;}
-      const workbenchMethods=new Set(["workbench-state","composition-ensure","composition-add-kit","composition-remove-kit","composition-configure","composition-enable","composition-plan","play","pause","resume","play-tick","stop","build-targets","build-inspect","build-plan","build-apply"]);
+      const workbenchMethods=new Set(["workbench-state","create-validation-game","composition-ensure","composition-add-kit","composition-remove-kit","composition-configure","composition-enable","composition-plan","play","play-input","pause","resume","play-tick","stop","runtime-preview","build-targets","build-inspect","build-plan","build-apply"]);
       if(workbenchMethods.has(message.method)){const result=await workbench.execute(message.method,message.params??{});json(response,{id:message.id,ok:true,result});return;}
       json(response,await routeAuthoringCommand(host,message));return;
     }

@@ -16,7 +16,7 @@ const button = (label, onclick, attrs = {}) => h("button", { class: "btn", oncli
 const pill = (text, kind = "") => h("span", { class: `pill ${kind}` }, text);
 const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); return el; };
 const uuid = () => crypto.randomUUID();
-const state = { data: null, selected: null, tab: "assets", busy: false, error: null, message: "Opening…", mode: "Object", gameView: false };
+const state = { data: null, selected: null, tab: "assets", busy: false, error: null, message: "Opening…", mode: "Object", gameView: false, pressed: new Set() };
 
 async function rpc(method, params = {}) {
   const response = await fetch("/api", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: uuid(), method, params }) });
@@ -29,7 +29,12 @@ const provider = createAuthoringThreePreview({ canvas: $("#viewport"), onSelect:
 async function refresh({ preview = true } = {}) {
   state.data = await (await fetch("/state", { cache: "no-store" })).json();
   if (preview) {
-    try { await provider.load(`/preview.glb?v=${state.data.status.context.clock}`, { ...state.data.view, width: innerWidth, height: innerHeight }); }
+    try {
+      const playing = state.gameView && state.data?.workbench?.play?.state !== "stopped";
+      const url = playing ? `/runtime.glb?v=${state.data.workbench.play.ticks}` : `/preview.glb?v=${state.data.status.context.clock}`;
+      provider.setViewMode?.(playing ? "game" : "scene");
+      await provider.load(url, { ...state.data.view, width: innerWidth, height: innerHeight }, { preserveCamera: playing });
+    }
     catch (error) { if (!/no Mesh prim|no mesh|contains no/i.test(error.message)) throw error; }
   }
   render(); return state.data;
@@ -58,7 +63,24 @@ async function createPrimitive(type) {
 }
 async function save() { return run("Save", () => rpc("save"), { preview: false }); }
 async function validate() { return run("Validate", () => rpc("validate-project"), { preview: false }); }
-async function play(action = "play") { return run(action, () => rpc(action, action === "play" ? { autoTick: true } : {}), { preview: false }); }
+async function play(action = "play") {
+  return run(action, async () => {
+    const result = await rpc(action, action === "play" ? { autoTick: true, controlledNodeId: "player-node" } : {});
+    if (action === "play" || action === "resume") state.gameView = true;
+    if (action === "stop") { state.gameView = false; state.pressed.clear(); provider.setViewMode?.("scene"); }
+    return result;
+  }, { preview: action !== "pause" });
+}
+async function createValidationGame() { return run("Create validation game", () => rpc("create-validation-game"), { preview: true }); }
+function inputIntent() {
+  const x = (state.pressed.has("d") || state.pressed.has("arrowright") ? 1 : 0) - (state.pressed.has("a") || state.pressed.has("arrowleft") ? 1 : 0);
+  const y = (state.pressed.has("w") || state.pressed.has("arrowup") ? 1 : 0) - (state.pressed.has("s") || state.pressed.has("arrowdown") ? 1 : 0);
+  return { x, y, actions: { primary: state.pressed.has(" "), interact: state.pressed.has("e") } };
+}
+async function sendPlayInput() {
+  if (state.data?.workbench?.play?.state === "stopped") return;
+  try { await rpc("play-input", { intent: inputIntent() }); } catch {}
+}
 async function exportFormat(format) { return run(`Export ${format.toUpperCase()}`, () => rpc("export", { format }), { preview: false }); }
 async function switchProject(method) {
   const directory = prompt(`${method === "new-project" ? "New" : "Open"} project directory`); if (!directory) return;
@@ -92,7 +114,18 @@ function dispatchMenu(action) {
 }
 function renderToolbar() {
   const el = clear($("#toolbar")), p = state.data?.workbench?.play?.state ?? "stopped";
-  el.append(button("▶ Play", () => play("play"), { class: "btn primary", disabled: p !== "stopped" }), button("⏸ Pause", () => play(p === "paused" ? "resume" : "pause"), { disabled: p === "stopped" }), button("■ Stop", () => play("stop"), { disabled: p === "stopped" }), h("div", { class: "divider" }), button("Validate", validate), button("Save", save), button("Build", () => setTab("build")), button("Export", () => exportFormat("glb")), h("div", { class: "divider" }), button("+ Cube", () => createPrimitive("box")), button("+ Sphere", () => createPrimitive("sphere")), button("+ Plane", () => createPrimitive("plane")), button("+ Torus", () => createPrimitive("torus")), h("span", { class: "spacer" }));
+  el.append(
+    button("▶ Play", () => play("play"), { class: "btn primary", disabled: p !== "stopped" }),
+    button("⏸ Pause", () => play(p === "paused" ? "resume" : "pause"), { disabled: p === "stopped" }),
+    button("■ Stop", () => play("stop"), { disabled: p === "stopped" }),
+    button("Scene", () => { state.gameView = false; provider.setViewMode?.("scene"); refresh(); }, { class: !state.gameView ? "btn primary" : "btn" }),
+    button("Game", () => { state.gameView = true; provider.setViewMode?.("game"); refresh(); }, { class: state.gameView ? "btn primary" : "btn", disabled: p === "stopped" }),
+    h("div", { class: "divider" }),
+    button("Validate", validate), button("Save", save), button("Build", () => setTab("build")), button("Export", () => exportFormat("glb")),
+    h("div", { class: "divider" }),
+    button("Proof Game", createValidationGame, { disabled: Boolean(state.data?.workbench?.validationGame?.ready) }),
+    button("+ Cube", () => createPrimitive("box")), button("+ Sphere", () => createPrimitive("sphere")), button("+ Plane", () => createPrimitive("plane")), button("+ Torus", () => createPrimitive("torus")), h("span", { class: "spacer" })
+  );
   for (const mode of ["Object", "Edit", "Sculpt", "Paint", "Rig", "Animation"]) el.append(button(mode, () => { state.mode = mode; renderToolbar(); renderInspector(); }, { class: mode === state.mode ? "btn primary" : "btn" }));
 }
 function renderOutliner() {
@@ -109,7 +142,25 @@ function renderInspector() {
   el.append(h("div", { class: "section-title" }, "TRANSFORM"));
   const xyz = h("div", { class: "xyz" });
   t.translation.forEach((v,i) => { const input = h("input", { type:"number", step:"0.1", value:String(v) }); input.onchange = () => updateNode(node, { ...node, transform: { ...t, translation: t.translation.map((x,j)=>j===i?Number(input.value):x) } }); xyz.append(h("label", {}, ["X","Y","Z"][i], input)); });
-  el.append(xyz, h("div", { class: "section-title" }, "MATERIALS"), h("div", {}, (node.materials ?? []).join(", ") || "None"), h("div", { class: "section-title" }, "RUNTIME DOMAINS"), button("+ Add Domain Capability", () => setTab("kits")), h("div", { class: "section-title" }, "ACTIONS"), button("Duplicate", () => duplicateNode(node)), button("Delete", () => deleteNode(node)));
+  el.append(xyz, h("div", { class: "section-title" }, "MATERIALS"), h("div", {}, (node.materials ?? []).join(", ") || "None"));
+  renderCapabilityInspector(el);
+  el.append(h("div", { class: "section-title" }, "ACTIONS"), button("Duplicate", () => duplicateNode(node)), button("Delete", () => deleteNode(node)));
+}
+function renderCapabilityInspector(el) {
+  const selected = new Map((state.data?.workbench?.composition?.content?.nodes ?? []).filter(n => n.kind === "kit" && n.enabled !== false).map(n => [n.registryId, n]));
+  for (const [label, prefix] of [["PHYSICS","n:physics"],["INPUT","n:interaction:input"],["INTERACTION","n:interaction"],["PRESENTATION","n:presentation"],["SEQUENCE","n:authoring:sequence"]]) {
+    const kits = state.data?.workbench?.catalog?.kits?.filter(k => (k.domainPath === prefix || k.domainPath.startsWith(prefix + ":")) && selected.has(k.id)) ?? [];
+    el.append(h("div", { class: "section-title" }, label));
+    if (!kits.length) { el.append(button("+ Add capability", () => setTab("kits"))); continue; }
+    for (const kit of kits.slice(0, 8)) {
+      const cnode = selected.get(kit.id);
+      el.append(h("div", { class: "kv" }, h("span", {}, kit.id), button("Configure", async () => {
+        const value = prompt(`Configure ${kit.id} as JSON`, JSON.stringify(cnode.config ?? {}, null, 2));
+        if (value == null) return;
+        await run(`Configure ${kit.id}`, () => rpc("composition-configure", { nodeId: cnode.id, config: JSON.parse(value) }), { preview: false });
+      })));
+    }
+  }
 }
 async function updateNode(old, next) {
   const assembly = state.data.assembly, content = assembly.content, nodes = content.nodes.map(n => n.id === old.id ? next : n);
@@ -133,13 +184,31 @@ function renderBottom() {
 }
 function catalogRow(title,desc,actions=[]) { return h("div",{class:"catalog-row"},h("div",{class:"catalog-main"},h("strong",{},title),h("span",{class:"muted"},desc)),h("div",{class:"catalog-meta"},...actions)); }
 function validationCard(title,value) { return h("div",{class:"validation-card"},h("h3",{},title),pill(value?.errors?`${value.errors} errors`:value?.ok===false?"invalid":"valid",value?.errors||value?.ok===false?"bad":"ok"),h("pre",{},JSON.stringify(value,null,2))); }
-function renderBuild(el,wb) { el.append(h("div",{class:"build-header"},h("h3",{},"BUILD TARGETS"),button("Refresh",()=>run("Build targets",()=>rpc("build-targets"),{preview:false})))); if(!wb.buildTargets?.length) el.append(h("div",{class:"empty"},"Build providers load on demand. Click Refresh.")); for(const t of wb.buildTargets??[]) el.append(catalogRow(t.id??t.name,t.status??"available",[button("Plan",()=>planBuild(t.id??t.name))])); }
+function renderBuild(el,wb) {
+  el.append(h("div",{class:"build-header"},h("h3",{},"BUILD TARGETS"),button("Refresh",()=>run("Build targets",()=>rpc("build-targets"),{preview:false}))));
+  if(!wb.buildTargets?.length) el.append(h("div",{class:"empty"},"Build providers load on demand. Click Refresh."));
+  for(const t of wb.buildTargets??[]) el.append(catalogRow(t.id??t.name,t.status??"available",[button("Plan",()=>planBuild(t.id??t.name))]));
+  if (wb.buildPlan) el.append(h("div",{class:"validation-card"},h("h3",{},"BUILD PLAN"),h("pre",{},JSON.stringify(wb.buildPlan,null,2)),button("Approve & Build",()=>applyBuild(wb.buildPlan),{class:"btn primary"})));
+  if (wb.buildReceipt) el.append(h("div",{class:"validation-card"},h("h3",{},"BUILD RECEIPT"),pill(wb.buildReceipt.status??"complete",wb.buildReceipt.status==="succeeded"?"ok":"warn"),h("pre",{},JSON.stringify(wb.buildReceipt,null,2))));
+}
 async function planBuild(target) { const project=prompt("Build project source directory",state.data.status.projectRoot??""); if(!project)return; return run(`Plan ${target}`,()=>rpc("build-plan",{request:{project,targets:[target],profile:"production"}}),{preview:false}); }
+async function applyBuild(plan) {
+  const output = prompt("Build output directory", state.data.status.projectRoot ? state.data.status.projectRoot + "/dist" : "");
+  if (!output) return;
+  return run("Approve & Build", () => rpc("build-apply", { planId: plan.id, approval: { planId: plan.id, approved: true }, options: { out: output } }), { preview: false });
+}
 function renderStatus() { const el=clear($("#statusbar")); if(!state.data)return; const s=state.data.status,wb=state.data.workbench; el.append(h("span",{},state.message),state.error?pill(state.error,"bad"):pill(s.dirty?"Unsaved":"Saved",s.dirty?"warn":"ok"),pill(`${wb.catalogSummary.domains} domains`),pill(`${wb.catalogSummary.kits} kits`),pill(`Play: ${wb.play.state}`),h("span",{class:"spacer"}),h("span",{class:"muted"},s.runtime?.version??"")); }
 function render() { if(!state.data)return; renderMenus();renderToolbar();renderOutliner();renderInspector();renderBottom();renderStatus();window.nexusWorkbench={state,provider,refresh,rpc}; }
 
 for(const tab of $("#bottom-tabs").querySelectorAll("button")) tab.addEventListener("click",()=>setTab(tab.dataset.tab));
-window.addEventListener("keydown",e=>{const command=e.ctrlKey||e.metaKey;if(command&&e.key.toLowerCase()==="s"){e.preventDefault();save();}if(command&&e.key.toLowerCase()==="p"){e.preventDefault();$("#command-palette").classList.toggle("open");$("#command-input").focus();}});
+window.addEventListener("keydown",e=>{
+  const command=e.ctrlKey||e.metaKey;
+  if(command&&e.key.toLowerCase()==="s"){e.preventDefault();save();return;}
+  if(command&&e.key.toLowerCase()==="p"){e.preventDefault();$("#command-palette").classList.toggle("open");$("#command-input").focus();return;}
+  const key=e.key.toLowerCase();
+  if(state.gameView && !command && ["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright","e"," "].includes(key)){state.pressed.add(key);sendPlayInput();}
+});
+window.addEventListener("keyup",e=>{const key=e.key.toLowerCase();if(state.pressed.delete(key))sendPlayInput();});
 $("#command-input")?.addEventListener("keydown",e=>{if(e.key!=="Enter")return;const v=e.currentTarget.value.trim().toLowerCase(),commands={"create cube":()=>createPrimitive("box"),"create sphere":()=>createPrimitive("sphere"),validate,play:()=>play("play"),stop:()=>play("stop"),"export glb":()=>exportFormat("glb"),"export fbx":()=>exportFormat("fbx"),"export usdz":()=>exportFormat("usdz")};commands[v]?.();$("#command-palette").classList.remove("open");e.currentTarget.value="";});
 window.addEventListener("resize",()=>provider.resize(innerWidth,innerHeight));window.addEventListener("beforeunload",()=>provider.dispose());
 try { await rpc("composition-ensure"); await refresh(); state.message="Ready"; render(); } catch(error) { state.error=error.message; state.message="Editor failed to open"; console.error(error); renderStatus(); }

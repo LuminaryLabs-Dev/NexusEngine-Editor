@@ -1,7 +1,11 @@
-export function createEditorBuildController({ stateRoot, artifactRoot, config = {} } = {}) {
+export function createEditorBuildController({ stateRoot, artifactRoot, config = {}, factory = null } = {}) {
   let buildPromise = null;
   const get = async () => {
-    if (!buildPromise) buildPromise = import("nexusengine/domains/build").then(({ createBuildDomain }) => createBuildDomain({ ...config, ...(stateRoot ? { stateRoot } : {}), ...(artifactRoot ? { artifactRoot } : {}) }));
+    if (!buildPromise) {
+      buildPromise = factory
+        ? Promise.resolve().then(() => factory({ stateRoot, artifactRoot, config }))
+        : import("nexusengine/domains/build").then(({ createBuildDomain }) => createBuildDomain({ ...config, ...(stateRoot ? { stateRoot } : {}), ...(artifactRoot ? { artifactRoot } : {}) }));
+    }
     return buildPromise;
   };
   return Object.freeze({

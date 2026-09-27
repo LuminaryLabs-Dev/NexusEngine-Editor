@@ -30,7 +30,9 @@ export function createAuthoringThreePreview({
     view = null,
     selected = null,
     disposed = false,
-    playback = null;
+    playback = null,
+    gameCamera = null,
+    viewMode = "scene";
   const textures = new Set(),
     lighting = new THREE.Group();
   scene.add(lighting);
@@ -82,12 +84,13 @@ export function createAuthoringThreePreview({
       textures.clear();
     }
     content = null;
+    gameCamera = null;
     mixer = null;
     animations = [];
   }
   function render() {
     if (disposed || !view) return;
-    renderer.render(scene, camera);
+    renderer.render(scene, viewMode === "game" && gameCamera ? gameCamera : camera);
   }
   function configure(next) {
     view = next;
@@ -168,6 +171,7 @@ export function createAuthoringThreePreview({
     clear();
     configure(nextView);
     content = gltf.scene;
+    gameCamera = gltf.cameras?.[0] ?? null;
     content.traverse((o) => {
       if (o.isMesh) {
         o.castShadow = true;
@@ -228,7 +232,7 @@ export function createAuthoringThreePreview({
     };
   }
   const pointer = (event) => {
-    if (gizmo.dragging || event.button !== 0 || !content) return;
+    if (viewMode === "game" || gizmo.dragging || event.button !== 0 || !content) return;
     const rect = canvas.getBoundingClientRect(),
       raycaster = new THREE.Raycaster();
     raycaster.setFromCamera(
@@ -265,11 +269,19 @@ export function createAuthoringThreePreview({
         renderer.setSize(width, height, false);
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
+        if (gameCamera?.isPerspectiveCamera) { gameCamera.aspect = width / height; gameCamera.updateProjectionMatrix(); }
         render();
       }
     },
+    setViewMode(mode = "scene") {
+      viewMode = mode === "game" ? "game" : "scene";
+      controls.enabled = viewMode === "scene";
+      if (viewMode === "game") gizmo.detach();
+      render();
+      return viewMode;
+    },
     select(id) {
-      if (!content) return;
+      if (!content || viewMode === "game") return;
       let target = null;
       content.traverse((o) => {
         if (o.userData.sourceNodeId === id && !o.isMesh) target ??= o;

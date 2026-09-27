@@ -34,7 +34,8 @@
     "authoring": "node scripts/nexus-authoring.mjs",
     "test:authoring": "node tests/run-authoring.mjs",
     "benchmark:authoring": "node benchmarks/authoring.mjs",
-    "test:workbench": "node tests/authoring-workbench.mjs"
+    "test:workbench": "node tests/authoring-workbench.mjs",
+    "test:game-workflow": "node tests/authoring-game-workflow.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
