@@ -1,2 +1,2 @@
-// Generated static Pages entry. Edit src/**, not this file.
-import "./src/main.js";
+// Generated static Pages entry. Edit src/workbench/**, not this file.
+import "./src/workbench/browser-client.js";

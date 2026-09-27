@@ -3,14 +3,48 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="nexus-editor-source" content="0bd8acc9237513d992b136eaccc08cc47b27665b" />
+    <meta name="nexus-editor-source" content="ec26bdee0c4ef9480401255c39bb0a6d43b0b369" />
     <meta name="nexus-core-commit" content="784e514722febf8fb09ca55a058b2736e93679bd" />
     <title>NexusEngine Editor</title>
     <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
     <link rel="stylesheet" href="./editor.css" />
+    <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+    "nexusengine": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/index.js",
+    "nexusengine/domains/authoring": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/authoring/index.js",
+    "nexusengine/domains/interaction/input": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/interaction/input/kits/input-kit/index.js",
+    "nexusengine/domains/composition": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/composition/index.js",
+    "nexusengine/domains/spatial/quaternion-math": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/spatial/kits/quaternion-math-kit.js",
+    "nexusengine/domains/object": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/object/index.js",
+    "nexusengine/domains/asset/registry": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/asset/kits/asset-kit/index.js",
+    "nexusengine/domains/presentation/graphics": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/presentation/graphics/kits/graphics-kit/index.js",
+    "nexusengine/domains/build": "https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/core-domains/build/index.js"
+  }
+}
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div class="app">
+      <div id="menus" class="row"></div>
+      <div id="toolbar" class="row"></div>
+      <div class="main">
+        <section class="panel"><div class="panel-title">OUTLINER</div><div id="outliner-list" class="scroll"></div></section>
+        <main class="viewport-wrap"><canvas id="viewport" aria-label="NexusEngine scene viewport"></canvas><div class="viewport-label">SCENE / GAME VIEW</div></main>
+        <section class="panel right"><div class="panel-title">INSPECTOR</div><div id="inspector-body" class="inspector"></div></section>
+        <section class="bottom">
+          <div id="bottom-tabs" class="tabs">
+            <button data-tab="assets" class="active">Assets</button><button data-tab="domains">Domains</button><button data-tab="kits">Kits</button>
+            <button data-tab="validation">Validation</button><button data-tab="composition">Composition</button><button data-tab="runtime">Runtime</button>
+            <button data-tab="build">Build</button><button data-tab="console">Console</button>
+          </div>
+          <div id="bottom-content"></div>
+        </section>
+      </div>
+      <div id="statusbar" class="status"></div>
+    </div>
     <script type="module" src="./editor.js"></script>
   </body>
 </html>

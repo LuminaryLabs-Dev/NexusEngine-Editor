@@ -29,14 +29,15 @@
     "mcp:game": "node examples/mcp-game-runtime.mjs",
     "smoke:intent": "node scripts/intent-smoke.mjs",
     "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
-    "test": "npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run build && npm run smoke:playwright",
+    "test": "npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run test:static-browser && npm run build && npm run smoke:playwright",
     "test:headless": "node tests/headless-strict.mjs",
     "authoring": "node scripts/nexus-authoring.mjs",
     "test:authoring": "node tests/run-authoring.mjs",
     "benchmark:authoring": "node benchmarks/authoring.mjs",
     "test:workbench": "node tests/authoring-workbench.mjs",
     "test:game-workflow": "node tests/authoring-game-workflow.mjs",
-    "publish:root": "node scripts/publish-static-root.mjs"
+    "publish:root": "node scripts/publish-static-root.mjs",
+    "test:static-browser": "node tests/static-browser-workbench.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
