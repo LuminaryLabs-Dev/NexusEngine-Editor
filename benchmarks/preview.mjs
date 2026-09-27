@@ -1,9 +1,7 @@
 import { chromium } from "playwright";
 import { writeFile } from "node:fs/promises";
-import {
-  createAuthoringHost,
-  encodeAuthoringGLB,
-} from "../src/authoring/index.js";
+import { createAuthoringHost } from "../src/authoring/index.js";
+import { createGLBAuthoringExportProvider } from "nexusengine/domains/authoring/publishing/export/providers/glb";
 import { startAuthoringPreview } from "../src/authoring/preview/localhost-server.js";
 const results = [],
   browser = await chromium.launch({
@@ -81,7 +79,7 @@ try {
           ],
         },
       });
-      const artifact = encodeAuthoringGLB(
+      const artifact = createGLBAuthoringExportProvider().encode(
         host.prepare({ assemblyId: "scene" }),
       ).bytes;
       server = await startAuthoringPreview({

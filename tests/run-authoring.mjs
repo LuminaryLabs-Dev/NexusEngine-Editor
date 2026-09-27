@@ -20,5 +20,5 @@ for (const name of tests) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 console.log(
-  `Passed ${tests.length} Authoring host, delivery, multi-format export, browser, worker and batch proofs.`,
+  `Passed ${tests.length} Authoring host, Core workbench, delivery, multi-format export, browser, worker and batch proofs.`,
 );

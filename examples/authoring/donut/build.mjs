@@ -12,11 +12,8 @@ const directory = resolve(process.argv[2] ?? "/tmp/nexus-authoring-donut"),
 try {
   const result = await buildDonut(host);
   await host.save();
-  const packet = host.prepare({ assemblyId: "scene" }),
-    published = await publishAuthoringGLB(packet, join(directory, "exports"), {
-      jobs: host.jobs,
-      commitGuard: (action) => host.finalize(packet, action),
-    });
+  const exported = await host.exportArtifact({ assemblyId: "scene", format: "glb", outputDirectory: join(directory, "exports") }),
+    published = { glb: exported.artifact, outputHash: exported.hash, byteLength: exported.bytes.length, validation: exported.validation, receipt: exported.receipt };
   await writeFile(
     join(directory, "recipe-evidence.json"),
     JSON.stringify(

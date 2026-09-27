@@ -2,8 +2,7 @@
 
 ![NexusEngine Editor social card](./docs/assets/brand/social-card.png)
 
-NexusEngine Editor is a static, viewport-first 3D web editor for composing
-Domain Service Kit projects and exporting browser-playable HTML.
+NexusEngine Editor is a viewport-first workbench for NexusEngine. The Core-native Authoring path lets humans create and import assets, edit scenes, inspect and configure Domains/Kits, validate, save/load, enter isolated Play Mode, export GLB/FBX/USDZ, and invoke Core Build targets without moving canonical engine behavior into the Editor.
 
 [Open the public editor](https://luminarylabs-dev.github.io/NexusEngine-Editor/)
 
@@ -13,8 +12,7 @@ Project format `0.4.0` stores an accepted
 derived from that accepted tree for templates, CLI commands, snapshots, and
 exports.
 
-For editable meshes, materials, rigs, animation and GLB output, start with
-[Authoring](./AUTHORING.md). This uses the required Engine runtime in a local host.
+For the Core-native 3D workflow, start with [Authoring](./AUTHORING.md) and [Workbench](./WORKBENCH.md). The Editor is the human GUI; NexusEngine owns Authoring, persistence, validation, import/export and Build semantics.
 
 ## What It Provides
 
@@ -22,6 +20,8 @@ For editable meshes, materials, rigs, animation and GLB output, start with
 - Docked Game Structure, Inspector, and Behaviors workspaces with no persistent overlays.
 - Registry-backed Domain and Kit composition with staged, atomic Apply.
 - Scene objects, transforms, camera controls, presets, templates, sequences, and receipts.
+- Core-native Authoring workbench with Assets, Domains, Kits, Validation, Composition, Runtime, Build and Console panels.
+- Scene outliner, inspector, create/import controls, Play/Pause/Stop and GLB/FBX/USDZ export through Core Authoring.
 - Single-file DSK HTML builds and standalone playable-project exports.
 - CLI operations for inspection, validation, templates, kit installation, and export.
 - Opt-in MCP servers for editor diagnostics, composition, and an isolated game runtime.
@@ -29,29 +29,25 @@ For editable meshes, materials, rigs, animation and GLB output, start with
 
 ## Engine Compatibility
 
-The browser and Node toolchain target the same exact NexusEngine `0.0.4`
-candidate:
+The Editor's Core-native Authoring host pins the exact NexusEngine `main` commit:
 
 ```txt
-a74e8689d1a71c0b42236c009f0f4c46e9b89387
+784e514722febf8fb09ca55a058b2736e93679bd
 ```
 
 The browser module URL is immutable:
 
 ```txt
-https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@a74e8689d1a71c0b42236c009f0f4c46e9b89387/src/index.js
+https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@784e514722febf8fb09ca55a058b2736e93679bd/src/index.js
 ```
 
-Until that commit is pushed, the CDN request fails closed. Local proof injects
-the exact installed Engine package from the same origin:
+Local and browser consumers should resolve the same committed Core identity. Local proof uses the exact installed Engine package:
 
 ```txt
 http://127.0.0.1:<port>/index.html?engine=/node_modules/nexusengine/src/index.js
 ```
 
-`package.json` records the Engine commit, registry hash, and packed-artifact
-hash. `package-lock.json` installs that commit without a sibling checkout or
-symlink.
+`package.json` records the exact Engine commit and registry hash. `package-lock.json` pins that commit without a sibling checkout or symlink; a packed-artifact hash must only be recorded after a fresh pack is actually produced and verified.
 
 ## Quick Start
 
@@ -113,7 +109,7 @@ read -> capture-before -> plan -> validate -> submit
   -> observe -> verify -> capture-after -> observed-differences
 ```
 
-NexusEngine Core remains limited to reusable contracts and composition atoms.
+NexusEngine Core is the canonical owner of Authoring, persistence, validation, import/export and Build semantics. Editor hosts, panels and adapters call those APIs rather than reimplementing them.
 
 ## MCP Boundaries
 
@@ -135,6 +131,15 @@ project mutation.
 The separate game MCP runtime is not installed into normal Editor exports. Its
 state-changing tool requires `NEXUS_GAME_MCP_ALLOW_ACTIONS=1`.
 
+## Core-native Authoring Workbench
+
+```bash
+npm run authoring -- create --project /path/project
+npm run authoring -- open --project /path/project
+```
+
+The workbench uses a real Core registry for Domain/Kit browsing and a real `domain-composition` Authoring document for selected project capabilities. Play Mode clones the Authoring snapshot before installing the selected composition, so runtime ticks do not silently mutate source. Build services load only when the Build panel is used.
+
 ## Architecture Map
 
 - `src/editor-domain-model.js`: project, scene, sequence, template, and export data.
@@ -142,6 +147,8 @@ state-changing tool requires `NEXUS_GAME_MCP_ALLOW_ACTIONS=1`.
 - `src/editor-composition-mcp.js`: Core Composition bridge and persisted receipts.
 - `src/nexus-engine-editor-runtime.js`: ordered Editor Kits and bindings.
 - `src/editor-kit-registry.js`: Kit manifests and registry snapshots.
+- `src/workbench/`: Core-native GUI controllers for catalog/composition, Play Mode, Build and browser workbench UI.
+- `src/authoring/host.js`: thin Core Authoring host for project lifecycle, import/export/validation and persistence.
 - `src/headless/index.js`: Node-only file-backed Headless Editor host.
 - `src/viewport-webgl.js`: dependency-free WebGL viewport.
 - `src/dsk-html-builder.js`: browser/Node single-file game builder.

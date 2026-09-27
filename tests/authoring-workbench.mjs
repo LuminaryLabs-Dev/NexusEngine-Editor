@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { createEngine } from "nexusengine";
+import { createAuthoringDomain } from "nexusengine/domains/authoring";
+import { createEditorWorkbench } from "../src/workbench/index.js";
+const engine=createEngine({kits:createAuthoringDomain({project:{projectId:"workbench-proof"}})}),project=engine.n.authoringProject;
+let n=0;const host={engine,requestId:()=>`editor-${++n}`,status:()=>({state:"ready",context:project.context(),kitIds:engine.kits.map(k=>k.id)}),list:k=>project.listDocuments(k),read:id=>project.getDocument(id),snapshot:o=>project.getSnapshot(o),command:async r=>project.execute(r),commitImport:p=>engine.n.authoringImport.commit(p)};
+const wb=createEditorWorkbench(host,{build:false});await wb.execute("composition-ensure");const catalog=wb.state().catalog;
+assert.ok(catalog.domains.length>100);assert.ok(catalog.kits.length>100);
+const candidate=catalog.kits.find(k=>!k.selected&&k.domainPath==="n:presentation")??catalog.kits.find(k=>!k.selected&&k.domainPath.startsWith("n:presentation"));assert.ok(candidate);
+assert.equal((await wb.execute("composition-add-kit",{kitId:candidate.id})).validation.ok,true);assert.equal((await wb.execute("composition-plan")).ok,true);
+const before=host.snapshot();assert.equal((await wb.execute("play",{autoTick:false})).state,"playing");await wb.execute("play-tick",{delta:1/60});await wb.execute("pause");await wb.execute("resume");await wb.execute("stop");assert.deepEqual(host.snapshot(),before);
+await wb.execute("composition-remove-kit",{kitId:candidate.id});assert.equal(wb.state().compositionValidation.ok,true);
+console.log(JSON.stringify({ok:true,domains:catalog.domains.length,kits:catalog.kits.length}));

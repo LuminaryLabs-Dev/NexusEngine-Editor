@@ -1,7 +1,6 @@
 # Authoring in NexusEngine Editor
 
-This host starts the pinned, real NexusEngine package and installs all 19
-`n:authoring` kits. The [Engine Authoring guide](https://github.com/LuminaryLabs-Dev/NexusEngine/blob/main/AUTHORING.md)
+This host starts the pinned, real NexusEngine package and installs the complete canonical `n:authoring` composition (39 kits at the pinned Core commit). The [Engine Authoring guide](https://github.com/LuminaryLabs-Dev/NexusEngine/blob/main/AUTHORING.md)
 describes the portable source schemas, commands and algorithm limits.
 
 ## Start a project
@@ -12,12 +11,7 @@ npm run authoring -- create --project /absolute/path/to/project
 npm run authoring -- open --project /absolute/path/to/project
 ```
 
-Open the printed localhost URL. The canvas toolbar creates box, sphere and torus
-meshes. The outliner selects assembly instances; the viewport provides orbit,
-selection and transform gizmos. The inspector exposes material assignment, a box
-face edit, animation playback and operation JSON. Use Save, Undo, Redo and Export.
-New/Open project controls save the current project before switching directories.
-The initial client is intended for desktop widths of 1024 pixels and larger.
+Open the printed localhost URL. The Core-native workbench provides File/Project/Domain/Kit/Build navigation, Play/Pause/Stop, Validate/Save/Export, a scene Outliner, Three.js viewport, Inspector, and Assets, Domains, Kits, Validation, Composition, Runtime, Build and Console panels. Create/import/edit actions call Core Authoring APIs; the viewport remains a presentation provider rather than source authority.
 
 Every source change goes through the same Project transaction API used by scripts.
 The JSON panel accepts an array of operations from `host.tools()`. Ctrl+Enter runs,
@@ -41,7 +35,7 @@ npm run authoring -- export --project /absolute/path/to/project --assembly scene
 
 Stdio accepts one JSON request per line and returns one response with the matching
 ID. Methods are `status`, `tools`, `list`, `read`, `execute`, `preview`, `accept`,
-`undo`, `redo`, `save`, `prepare`, `export-formats`, `inspect-export`, `export` and `close`. Errors contain a stable code, message
+`create`, `undo`, `redo`, `save`, `load`, `prepare`, `import-formats`, `import`, `import-commit`, `export-formats`, `inspect-export`, `validate-project`, `validate-document`, `validate-export`, `export` and `close`. Errors contain a stable code, message
 and details. Example execute frame (replace the epoch with current status):
 
 ```json
@@ -90,33 +84,13 @@ remain the caller's responsibility.
 
 ## Persistence and recovery
 
-A project directory contains `project.json`, `documents/`, `blobs/`,
-`checkpoints/` and `journal.jsonl`. Immutable document versions are content
-addressed across current source and history. Images use deduplicated raw tile
-blobs. The current manifest is replaced only after files and directories have
-been synced. An exclusive local writer session and generation compare prevent
-competing saves. A stale process lock is recoverable only after its PID is absent.
+Persistence is owned by NexusEngine Core. The Editor filesystem adapter selects a directory and passes the Core target `{ storage: "filesystem", path }` to `authoringPersistence`. The project manifest is `authoring-project.json` with schema `nexusengine.authoring-package/1`; integrity, content addressing, generation checks and restore semantics are Core behavior.
 
-Acknowledged small edits have ordered, hash-chained journal records. Reopen
-validates and replays them, then writes a fresh checkpoint. Corruption or an
-incomplete journal record is reported; the host does not guess missing edits.
-An applied edit whose journal write failed remains in memory with an explicit
-persistence error; Save must succeed before further edits or normal close.
-
-`host.snapshot()` returns a mutable portable copy. `host.snapshot({immutable:true})`
-returns a read-only snapshot sharing validated immutable versions for efficient
-serialization. Core's default history retains 128 edits and 10,000 receipts.
-Receipt-capacity exhaustion is explicit; saving alone does not clear receipts.
-Keep projects bounded and archive completed work before creating a fresh project.
-
-The separate `./authoring/storage/browser` export supplies IndexedDB atomic
-checkpoints with generation checks. It requires explicit saves and does not
-provide the Node filesystem journal or writer lease. Neither profile supplies
-multi-user merging, distributed locks or cross-device asset hosting.
+`host.snapshot()` still exposes portable Authoring source for inspection. Save/Load never use a second Editor project package format. Browser persistence validation targets Core's IndexedDB provider rather than an Editor-owned IndexedDB implementation.
 
 ## Jobs and export
 
-Workers execute modifier evaluation, procedural image baking and GLB encoding.
+Workers execute modifier evaluation, procedural image baking and Core GLB encoding.
 Defaults: two active workers, 16 queued jobs, 60 seconds per job, 512 MiB V8 old
 heap per worker and 192 MiB input/result transfer. V8 limits are not an OS sandbox
 or an RSS guarantee. Cancellation terminates the worker; project close awaits
@@ -124,21 +98,9 @@ termination. Derived results commit only if every captured source revision and
 hash still matches. Large derived images use a checkpoint instead of an oversized
 journal record. The largest supported bake is 4096×4096 RGBA8.
 
-Publishing is owned by the `n:editor:export` Domain Service Kit. It consumes the
-format-neutral Authoring delivery packet, selects an installed provider, validates
-the encoded artifact and atomically publishes a content-addressed directory with
-`provenance.json` and `validation.json`. Source hashes/revisions are checked again
-before commit.
+Publishing and export are owned by NexusEngine Core. The Editor calls `authoringPublishing` for evaluated delivery packets and `authoringExport` for capability inspection, encoding, validation, publication and receipts. GLB, FBX and USDZ are the canonical Core providers at the pinned Engine commit; the Editor contains no canonical format codec.
 
-The GLB provider retains the full existing profile: metallic-roughness PBR textures,
-hierarchy, skin joints/weights, animation clips, morph position/normal deltas,
-cameras and punctual lights with Khronos validation. The USDZ and FBX providers
-currently expose explicit static-asset V1 profiles: evaluated meshes, hierarchy,
-transforms and scalar PBR material values. They fail closed for rigs/skins,
-animation, morphs, textures, cameras, lights, excluded-parent hierarchies and
-multi-material mesh instances rather than silently dropping authored data. USDZ
-writes aligned stored USDZ with USDA content; FBX writes deterministic FBX 7.4
-ASCII and reports the metallic-roughness approximation as a warning.
+Import is likewise Core-owned through `authoringImport` (GLB, binary FBX, USDA/USDZ and OBJ in the current Core profiles), and project validation comes from `authoringValidation`.
 
 Source documents remain the editable authority; exported triangles are delivery
 data. Additional formats can register providers without changing Authoring.
@@ -159,12 +121,15 @@ and normal textures, and seeded surface-scattered sprinkles. Mechanical and
 organic fixtures exercise convex bevels, shared parts, rigs, weights, clips and
 shape keys. Renders inspect exported bytes, not independently recreated geometry.
 
-The ten integrated proof groups cover host recovery, GLB publication, multi-format export, causal
+The integrated proof groups cover Core persistence recovery, the Core workbench, multi-format export, causal
 texture renders, UI edits/project switching, CLI, worker recovery, browser storage,
-independent skeletal/morph deformation and 1/10/100-job batch recovery. The
+independent skeletal/morph deformation and 1/10/100-job batch recovery. Workbench proof additionally covers real Core Domain/Kit registry discovery, project composition and Play Mode source isolation. The
 benchmark runs three fresh processes each for 10k/100k vertices and 1K/2K/4K images;
 filesystem caches may remain warm. Source limits are 100k vertices/200k faces and
 4096-pixel image sides; 1M meshes and 8K images reject explicitly. Performance
 measurements do not establish suitability for hundreds of thousands of scenes.
 
 See [validation scope](docs/AUTHORING-VALIDATION.md) and [measured performance](docs/AUTHORING-PERFORMANCE.md) for evidence and practical limits.
+
+
+See also [WORKBENCH.md](./WORKBENCH.md) for Domain/Kit composition, Play Mode, Build, and GUI ownership boundaries.

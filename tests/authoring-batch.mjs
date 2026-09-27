@@ -59,14 +59,11 @@ const run = async (job, { directory, signal }) => {
       ],
     });
     const packet = host.prepare({ assemblyId: "scene" }),
-      output = await publishAuthoringGLB(packet, directory, {
-        signal,
-        commitGuard: (action) => host.finalize(packet, action),
-      });
+      output = await host.exportArtifact({ assemblyId: "scene", format: "glb", outputDirectory: directory, signal });
     return {
-      glb: output.glb,
-      outputHash: output.outputHash,
-      byteLength: output.byteLength,
+      glb: output.artifact,
+      outputHash: output.hash,
+      byteLength: output.bytes.length,
       bounds: packet.meshes[0].bounds,
     };
   } finally {

@@ -6,10 +6,7 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 import { createAuthoringHost } from "../src/authoring/host.js";
 import { startAuthoringPreview } from "../src/authoring/preview/localhost-server.js";
-import {
-  encodeAuthoringGLB,
-  validateAuthoringGLB,
-} from "../src/authoring/index.js";
+import { createGLBAuthoringExportProvider } from "nexusengine/domains/authoring/publishing/export/providers/glb";
 import { buildOrganic } from "../examples/authoring/organic/recipe.js";
 const host = await createAuthoringHost();
 let server, browser;
@@ -62,8 +59,8 @@ try {
       ),
     worldMatrix = matrix(parent).multiply(matrix(local));
   const packet = host.prepare({ assemblyId: "scene" }),
-    artifact = encodeAuthoringGLB(packet);
-  await validateAuthoringGLB(artifact.bytes);
+    artifact = createGLBAuthoringExportProvider().encode(packet);
+  assert.equal((await createGLBAuthoringExportProvider().validate(artifact.bytes, { resources: artifact.resources })).errors, 0);
   server = await startAuthoringPreview({
     host,
     artifact: artifact.bytes,

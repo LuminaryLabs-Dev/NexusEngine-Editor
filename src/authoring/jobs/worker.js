@@ -1,7 +1,7 @@
 import { parentPort, workerData } from "node:worker_threads";
 import { serialize } from "node:v8";
 import { createAuthoringRuntime } from "../runtime-composition.js";
-import { encodeAuthoringGLB } from "../export/glb.js";
+import { createGLBAuthoringExportProvider } from "nexusengine/domains/authoring/publishing/export/providers/glb";
 import { authoringErrorRecord } from "../command-router.js";
 let runtime;
 const progress = (stage) => parentPort.postMessage({ type: "progress", stage });
@@ -11,7 +11,7 @@ try {
   let result;
   if (kind === "encode-glb") {
     progress("encoding");
-    result = encodeAuthoringGLB(payload.packet);
+    result = createGLBAuthoringExportProvider().encode(payload.packet);
   } else {
     runtime = createAuthoringRuntime({ projectId: payload.snapshot.projectId });
     runtime.project.recover(payload.snapshot, []);

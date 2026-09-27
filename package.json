@@ -10,15 +10,13 @@
     "./headless/strict": "./src/headless/strict.js",
     "./headless/development": "./src/headless/development.js",
     "./authoring": "./src/authoring/index.js",
-    "./authoring/storage/browser": "./src/authoring/storage/browser-project.js",
     "./authoring/preview": "./src/authoring/preview/localhost-server.js",
-    "./editor/export": "./src/editor/export/index.js"
+    "./workbench": "./src/workbench/index.js"
   },
   "nexusEngineArtifact": {
     "version": "0.0.4",
-    "commit": "a74e8689d1a71c0b42236c009f0f4c46e9b89387",
-    "registryHash": "sha256:d2b8af8d1d542bdb125d33b8a4ff5a32de1cf73da399e57e9a29b5ae35d4a8f5",
-    "tarballSha256": "5a7e2985fd1c67e1204490570e7ccf008eff742f157485bfa552881584b2883b"
+    "commit": "784e514722febf8fb09ca55a058b2736e93679bd",
+    "registryHash": "sha256:3b520f699299e0f8bc4fdab8a4b2297c823d94b22dbee30ee250d873e39cd30e"
   },
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
@@ -35,7 +33,8 @@
     "test:headless": "node tests/headless-strict.mjs",
     "authoring": "node scripts/nexus-authoring.mjs",
     "test:authoring": "node tests/run-authoring.mjs",
-    "benchmark:authoring": "node benchmarks/authoring.mjs"
+    "benchmark:authoring": "node benchmarks/authoring.mjs",
+    "test:workbench": "node tests/authoring-workbench.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
@@ -57,7 +56,7 @@
     "gltf-validator": "2.0.0-dev.3.10",
     "pngjs": "7.0.0",
     "three": "0.180.0",
-    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#a74e8689d1a71c0b42236c009f0f4c46e9b89387"
+    "nexusengine": "git+https://github.com/LuminaryLabs-Dev/NexusEngine.git#784e514722febf8fb09ca55a058b2736e93679bd"
   },
   "bin": {
     "nexus-authoring": "./scripts/nexus-authoring.mjs"

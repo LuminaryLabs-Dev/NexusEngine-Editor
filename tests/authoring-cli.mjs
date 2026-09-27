@@ -29,8 +29,8 @@ const exchange = async (message) => {
 const timeout = setTimeout(() => child.kill("SIGKILL"), 15000);
 try {
   const status = await exchange({ id: "status", method: "status" });
-  assert.equal(status.kitIds.length, 20);
-  assert.ok(status.kitIds.includes("editor-export-service-kit"));
+  assert.equal(status.kitIds.length, 39);
+  assert.equal(status.kitIds.includes("editor-export-service-kit"), false);\n  assert.equal(status.runtime.canonicalAuthoring, true);
   const formats = await exchange({ id: "formats", method: "export-formats" });
   assert.deepEqual(formats.map((entry) => entry.format), ["fbx", "glb", "usdz"]);
   const tools = await exchange({ id: "tools", method: "tools" });

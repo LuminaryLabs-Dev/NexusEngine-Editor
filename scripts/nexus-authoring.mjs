@@ -42,7 +42,7 @@ try {
       );
     if (["open", "run", "export"].includes(command) && !existing)
       throw Error(
-        "No Authoring project exists in this directory; create it first.",
+        "No Core Authoring project exists in this directory; create it first.",
       );
     host = await createAuthoringHost({ store });
     const output = options["--output"]

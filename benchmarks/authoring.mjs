@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { createAuthoringHost } from "../src/authoring/host.js";
 import { createFileProjectStore } from "../src/authoring/storage/file-project.js";
 import { bakeAuthoringTexture } from "../src/authoring/jobs/evaluate.js";
-import { encodeAuthoringGLB } from "../src/authoring/export/glb.js";
+import { createGLBAuthoringExportProvider } from "nexusengine/domains/authoring/publishing/export/providers/glb";
 const [mode, sizeText] = process.argv.slice(2);
 if (mode === "mesh" || mode === "image") {
   const size = Number(sizeText),
@@ -180,7 +180,7 @@ if (mode === "mesh" || mode === "image") {
     const packet = await measure("prepare", () =>
         host.prepare({ assemblyId: "scene" }),
       ),
-      encoded = await measure("export", () => encodeAuthoringGLB(packet));
+      encoded = await measure("export", () => createGLBAuthoringExportProvider().encode(packet));
     console.log(
       JSON.stringify({
         mode,
