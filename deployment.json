@@ -1,9 +1,9 @@
 {
   "schema": "nexusengine-editor.deployment/2",
   "deploymentMode": "branch-root-static-browser-workbench",
-  "sourceParent": "ec26bdee0c4ef9480401255c39bb0a6d43b0b369",
+  "sourceParent": "610b583bf9783051bbc49246882b015e24266486",
   "coreCommit": "784e514722febf8fb09ca55a058b2736e93679bd",
   "coreRegistry": "sha256:3b520f699299e0f8bc4fdab8a4b2297c823d94b22dbee30ee250d873e39cd30e",
-  "artifactFingerprint": "sha256:57b7a349cf65f91469e7d8892263e40b6b808f18329f8c3c500ac105a86cb50c",
+  "artifactFingerprint": "sha256:2745f6ee5b3635be38197a7b57cea6bae2ccab906338a56532c485ff77160cd2",
   "entry": "index.html"
 }
