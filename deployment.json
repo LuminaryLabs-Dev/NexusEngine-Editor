@@ -1,9 +1,11 @@
 {
-  "schema": "nexusengine-editor.deployment/2",
-  "deploymentMode": "branch-root-static-browser-workbench",
-  "sourceParent": "610b583bf9783051bbc49246882b015e24266486",
+  "schema": "nexusengine-editor.deployment/source-overlay/1",
+  "deploymentMode": "branch-root-static-source-modules",
+  "sourceParent": "267222f71dd6adc662fe1045a71d08119eedb142",
   "coreCommit": "784e514722febf8fb09ca55a058b2736e93679bd",
   "coreRegistry": "sha256:3b520f699299e0f8bc4fdab8a4b2297c823d94b22dbee30ee250d873e39cd30e",
-  "artifactFingerprint": "sha256:2745f6ee5b3635be38197a7b57cea6bae2ccab906338a56532c485ff77160cd2",
-  "entry": "index.html"
+  "entry": "index.html",
+  "validatedSourceCandidate": "NexusEngine-Editor-Repair-Candidate",
+  "validation": "38 targeted Node tests passed; 31 syntax checks passed. Browser navigation remained sandbox-policy blocked.",
+  "note": "GitHub Pages serves main /(root); no Actions build/deploy workflow."
 }
