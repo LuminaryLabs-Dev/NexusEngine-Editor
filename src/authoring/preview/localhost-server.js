@@ -1,62 +1,82 @@
 import http from "node:http";
 import { dirname, resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { build } from "esbuild";
 import { createAuthoringHost } from "../host.js";
 import { createFileProjectStore } from "../storage/file-project.js";
-import { routeAuthoringCommand, authoringErrorRecord } from "../command-router.js";
 import { createAuthoringView } from "./view.js";
-import { createEditorWorkbench } from "../../workbench/index.js";
-
+import { createEditorBuildController } from "../../workbench/build-controller.js";
+import { createLocalWorkbenchSession } from "../../workbench/adapters/local-session.js";
+import { workbenchHtml } from "../../workbench/shell.js";
+import { encodeWire, decodeWire } from "../../workbench/adapters/binary-wire.js";
+import { editorError, errorRecord } from "../../workbench/host-contract.js";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NexusEngine Editor</title><style>
-:root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#dce5f4;background:#0b0f16;font-size:13px;--panel:#121925;--panel2:#182130;--line:#253248;--muted:#8495af;--accent:#6ea8ff;--good:#5dd39e;--warn:#e8bd67;--bad:#ff7b7b}*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#0a0e15}button,input{font:inherit;color:inherit}.app{height:100%;display:grid;grid-template-rows:34px 42px 1fr 24px}.row{display:flex;align-items:center;gap:6px;background:var(--panel);border-bottom:1px solid var(--line);padding:4px 8px}.brand{display:flex;gap:7px;align-items:center;margin-right:8px;letter-spacing:.06em}.brand strong{color:#fff}.brand span{font-size:10px;color:var(--muted)}.btn{border:1px solid transparent;background:transparent;padding:5px 8px;border-radius:4px;cursor:pointer;white-space:nowrap}.btn:hover{background:#223047}.btn.primary{background:#245da7;border-color:#3979ce}.btn:disabled{opacity:.35;cursor:not-allowed}.divider{width:1px;height:24px;background:var(--line);margin:0 3px}.spacer{flex:1}.main{min-height:0;display:grid;grid-template-columns:240px 1fr 280px;grid-template-rows:1fr 260px}.panel{min-width:0;min-height:0;background:var(--panel);border-right:1px solid var(--line);overflow:hidden}.panel.right{border-right:0;border-left:1px solid var(--line)}.panel-title,.section-title{font-size:10px;color:var(--muted);font-weight:700;letter-spacing:.08em;padding:9px 10px 6px}.scroll{overflow:auto;height:calc(100% - 30px)}.tree-row,.asset-row{display:flex;width:100%;gap:8px;align-items:center;border:0;background:transparent;color:#cbd6e8;padding:6px 10px;text-align:left;cursor:pointer}.tree-row:hover,.asset-row:hover,.tree-row.selected,.asset-row.selected{background:#1d2b40}.viewport-wrap{position:relative;min-width:0;min-height:0;background:#080b10}.viewport-wrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}.viewport-label{position:absolute;top:8px;left:8px;padding:4px 7px;background:#0b1019cc;border:1px solid var(--line);border-radius:4px;color:var(--muted);pointer-events:none}.inspector{padding:10px;overflow:auto;height:100%}.inspector h3{margin:2px 0 4px}.muted{color:var(--muted)}.small{font-size:11px;color:#70839f}.xyz{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.xyz label{font-size:10px;color:var(--muted)}.xyz input{width:100%;background:#0d1420;border:1px solid var(--line);padding:5px;border-radius:3px}.kv{display:flex;justify-content:space-between;gap:10px;padding:4px 0}.bottom{grid-column:1/4;border-top:1px solid var(--line);background:#0e1520;min-height:0;display:grid;grid-template-rows:34px 1fr}.tabs{display:flex;align-items:end;padding:0 8px;border-bottom:1px solid var(--line)}.tabs button{border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);padding:9px 12px 7px;cursor:pointer}.tabs button.active{color:#fff;border-color:var(--accent)}#bottom-content{overflow:auto;padding:8px}.catalog-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border-bottom:1px solid #1b2637;padding:8px}.catalog-main{display:flex;min-width:0;flex-direction:column;gap:3px}.catalog-meta{display:flex;gap:5px;align-items:center}.pill{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px 7px;font-size:10px;color:#9eb0ca}.pill.ok{color:var(--good);border-color:#285d49}.pill.warn{color:var(--warn);border-color:#665029}.pill.bad{color:var(--bad);border-color:#6b3030}.validation-card pre{white-space:pre-wrap;color:#9fb0c7;font-size:11px}.console-row{display:grid;grid-template-columns:70px 220px 1fr;gap:10px;padding:4px 8px;border-bottom:1px solid #192333}.status{display:flex;gap:8px;align-items:center;background:#080c12;border-top:1px solid var(--line);padding:2px 8px;font-size:11px}.empty{padding:20px;color:var(--muted)}#command-palette{display:none;position:absolute;z-index:30;top:80px;left:50%;transform:translateX(-50%);width:520px;background:#151e2c;border:1px solid #395173;padding:10px;box-shadow:0 18px 60px #0008}#command-palette.open{display:block}#command-input{width:100%;background:#0c131d;border:1px solid var(--line);padding:9px}.build-header{display:flex;align-items:center;gap:10px}
-</style></head><body><div class="app"><div id="menus" class="row"></div><div id="toolbar" class="row"></div><div class="main"><section class="panel"><div class="panel-title">OUTLINER</div><div id="outliner-list" class="scroll"></div></section><main class="viewport-wrap"><canvas id="viewport" aria-label="NexusEngine scene viewport"></canvas><div class="viewport-label">SCENE / GAME VIEW</div></main><section class="panel right"><div class="panel-title">INSPECTOR</div><div id="inspector-body" class="inspector"></div></section><section class="bottom"><div id="bottom-tabs" class="tabs"><button data-tab="assets" class="active">Assets</button><button data-tab="domains">Domains</button><button data-tab="kits">Kits</button><button data-tab="validation">Validation</button><button data-tab="composition">Composition</button><button data-tab="runtime">Runtime</button><button data-tab="build">Build</button><button data-tab="console">Console</button></div><div id="bottom-content"></div></section></div><div id="statusbar" class="status"></div></div><div id="command-palette"><input id="command-input" placeholder="Search commands…"></div><script type="module" src="/client.js"></script></body></html>`;
 
 export async function startAuthoringPreview({ host, assemblyId = "scene", port = 0, outputDirectory, view = {}, artifact = null, ui = true } = {}) {
   const readOnly = Boolean(artifact) || ui === false;
-  let ownsHost = false, switching = false, workbench = createEditorWorkbench(host, { build: {} });
-  const bundle = await build({ entryPoints: [join(root, readOnly ? "authoring/preview/viewer.js" : "workbench/client.js")], bundle: true, format: "esm", platform: "browser", write: false, logLevel: "silent" });
-  const script = bundle.outputFiles[0].contents;
-  let cached = null, url = null, closing = false; const clients = new Set();
-  const json = (response, value, status = 200) => { response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); response.end(JSON.stringify(value)); };
-  async function receive(request) { let size=0;const chunks=[];for await(const chunk of request){size+=chunk.length;if(size>64*1024*1024)throw Object.assign(new Error("HTTP request is too large."),{code:"AUTHORING_TRANSPORT_BUDGET"});chunks.push(chunk);}return JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-  async function preview() {
-    if (artifact) { const hash=`artifact:${artifact.byteLength}`; return { packetHash: hash, hash, bytes: artifact }; }
-    const packet = host.prepare({ assemblyId }); if (cached?.packetHash === packet.hash) return cached;
-    const result = await host.exportArtifact({ assemblyId, format: "glb" }); cached = { packetHash: packet.hash, hash: result.hash, bytes: result.bytes }; return cached;
+  let ownsHost = false, closing = false, url = null, tail = Promise.resolve();
+  const buildService = createEditorBuildController();
+  const session = createLocalWorkbenchSession(host, { assemblyId, outputDirectory, view: createAuthoringView(view), buildService,
+    async switchProject(method, directory, previous, params = {}) {
+      if (typeof directory !== "string" || !directory.trim()) throw editorError("EDITOR_PROJECT_DIRECTORY", "A project directory is required.");
+      if (previous.status().dirty && params.discard !== true) throw editorError("EDITOR_UNSAVED_PROJECT", "Save or explicitly discard the current project first.");
+      const store = await createFileProjectStore(directory), exists = await store.manifest();
+      if (method === "new-project" && exists) throw editorError("EDITOR_PROJECT_EXISTS", "The directory already contains a Core project.");
+      if (method === "open-project" && !exists) throw editorError("EDITOR_PROJECT_MISSING", "The directory has no Core project.");
+      const next = await createAuthoringHost({ store });
+      try { await previous.close({ save: false }); } catch (error) { await next.close(); throw error; }
+      ownsHost = true; return next;
+    } });
+  const bundle = await build({ entryPoints: [join(root, readOnly ? "authoring/preview/viewer.js" : "workbench/client.js")],
+    outfile: join(root, "../.test-results/local/client.js"), bundle: true, format: "esm", platform: "browser", target: "es2022", write: false, logLevel: "silent" });
+  const script = bundle.outputFiles.find(f => f.path.endsWith(".js"))?.contents;
+  const css = bundle.outputFiles.find(f => f.path.endsWith(".css"))?.contents ?? new Uint8Array();
+  if (!script) throw new Error("Local workbench bundle has no JavaScript entry.");
+  const html = readOnly ? '<!doctype html><html><head><meta charset="utf-8"></head><body style="margin:0;background:#080b10"><canvas id="viewport" style="width:100vw;height:100vh"></canvas><script type="module" src="./client.js"></script></body></html>'
+    : workbenchHtml({ script: "./client.js", stylesheet: "./client.css", favicon: "./favicon.svg" });
+  const clients = new Set();
+  const json = (response, value, status = 200) => { response.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store" }); response.end(JSON.stringify(encodeWire(value))); };
+  async function receive(request) {
+    let bytes = 0; const chunks = [];
+    for await (const chunk of request) { bytes += chunk.length; if (bytes > 96 * 1024 * 1024) throw editorError("AUTHORING_TRANSPORT_BUDGET", "Request is too large."); chunks.push(chunk); }
+    const message = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (typeof message.id !== "string" || !message.id || typeof message.method !== "string" || !message.method) throw editorError("AUTHORING_TRANSPORT_INPUT", "A request id and method are required.");
+    message.params = decodeWire(message.params ?? {}); return message;
   }
-  const server=http.createServer(async(request,response)=>{try{
-    if(closing){json(response,{ok:false,error:{message:"Server is closing."}},503);return;}
-    if(request.headers.origin&&request.headers.origin!==url){json(response,{ok:false,error:{message:"Origin differs from this local authoring host."}},403);return;}
-    const path=new URL(request.url,url??"http://127.0.0.1").pathname;
-    if(request.method==="GET"&&path==="/"){response.writeHead(200,{"Content-Type":"text/html","Cache-Control":"no-store"});response.end(readOnly ? '<!doctype html><html><body style="margin:0;background:#080b10"><canvas id="viewport" style="width:100vw;height:100vh;display:block"></canvas><script type="module" src="/client.js"></script></body></html>' : html);return;}
-    if(request.method==="GET"&&path==="/client.js"){response.writeHead(200,{"Content-Type":"text/javascript"});response.end(script);return;}
-    if(request.method==="GET"&&path==="/state"){
-      const documents=host.list(),assembly=documents.some(d=>d.id===assemblyId)?host.read(assemblyId):null;
-      json(response,{status:host.status(),documents,assemblyId,assembly,view:createAuthoringView(view),validation:host.validateProject(),exportFormats:host.exportFormats(),importFormats:host.importFormats(),workbench:workbench.state()});return;
-    }
-    if(request.method==="GET"&&path==="/preview.glb"){const content=await preview();response.writeHead(200,{"Content-Type":"model/gltf-binary","Cache-Control":"no-store","X-Authoring-Source":content.packetHash,"X-Artifact-Hash":content.hash});response.end(content.bytes);return;}
-    if(request.method==="GET"&&path==="/runtime.glb"){
-      const content=await workbench.play.preview({format:"glb"});
-      response.writeHead(200,{"Content-Type":"model/gltf-binary","Cache-Control":"no-store","X-Runtime-Ticks":String(workbench.play.status().ticks),"X-Artifact-Hash":content.hash});
-      response.end(content.bytes);return;
-    }
-    if(request.method==="POST"&&path==="/api"){
-      const message=await receive(request);if(switching)throw Error("A project switch is already running.");
-      if(["open-project","new-project"].includes(message.method)){
-        switching=true;try{const directory=message.params?.directory;if(typeof directory!=="string"||!directory.trim())throw Error("A project directory is required.");const store=await createFileProjectStore(directory),exists=await store.manifest();if(message.method==="new-project"&&exists)throw Error("The selected directory already contains a Core Authoring project.");if(message.method==="open-project"&&!exists)throw Error("The selected directory has no authoring-project.json.");const next=await createAuthoringHost({store,projectId:message.params?.projectId??"project"});try{await host.close({save:true});}catch(error){await next.close();throw error;}host=next;ownsHost=true;workbench=createEditorWorkbench(host,{build:{}});cached=null;outputDirectory=join(store.root,"exports");json(response,{id:message.id,ok:true,result:{project:store.root,status:host.status()}});return;}finally{switching=false;}
+  async function preview(play = false) {
+    if (artifact) { const bytes = new Uint8Array(artifact); const hash = `sha256:${createHash("sha256").update(bytes).digest("hex")}`; return { bytes, hash, packetHash: hash }; }
+    const result = await session.execute(play ? "runtime-preview" : "preview-artifact");
+    return { ...result, packetHash: result.receipt?.sourcePacket ?? result.hash };
+  }
+  const server = http.createServer(async (request, response) => {
+    try {
+      if (closing) return json(response, { ok: false, error: { message: "Host is closing." } }, 503);
+      if (request.headers.host !== new URL(url).host || (request.headers.origin && request.headers.origin !== url)) return json(response, { ok: false, error: { message: "Origin/Host differs from this loopback host." } }, 403);
+      const path = new URL(request.url, url).pathname;
+      if (request.method === "GET") {
+        if (path === "/") { response.writeHead(200, { "Content-Type": "text/html", "Cache-Control": "no-store" }); response.end(html); return; }
+        if (path === "/client.js" || path === "/client.css") { response.writeHead(200, { "Content-Type": path.endsWith("css") ? "text/css" : "text/javascript", "Cache-Control": "no-store" }); response.end(path.endsWith("css") ? css : script); return; }
+        if (path === "/favicon.svg") { response.writeHead(200, { "Content-Type": "image/svg+xml" }); response.end(await readFile(join(root, "../assets/favicon.svg"))); return; }
+        if (path === "/state") return json(response, session.state());
+        if (path === "/preview.glb" || path === "/runtime.glb") {
+          const result = await preview(path === "/runtime.glb"); response.writeHead(200, { "Content-Type": "model/gltf-binary", "Cache-Control": "no-store", "X-Artifact-Hash": result.hash, "X-Authoring-Source": result.packetHash }); response.end(result.bytes); return;
+        }
       }
-      if(message.method==="export"){if(!outputDirectory)throw Object.assign(new Error("This preview has no export directory."),{code:"AUTHORING_EXPORT_DESTINATION"});const result=await host.exportArtifact({assemblyId,format:message.params?.format??"glb",outputDirectory});json(response,{id:message.id,ok:true,result:{...result,bytes:undefined,resources:undefined}});return;}
-      if(message.method==="workbench-import-inspect"){const {base64,...params}=message.params??{};if(typeof base64!=="string")throw Error("Import bytes are required.");const result=await host.inspectImport({...params,bytes:Buffer.from(base64,"base64"),resources:{}});json(response,{id:message.id,ok:true,result});return;}
-      if(message.method==="workbench-import-commit"){const result=await host.commitImport(message.params.plan);json(response,{id:message.id,ok:true,result});return;}
-      const workbenchMethods=new Set(["workbench-state","create-validation-game","composition-ensure","composition-add-kit","composition-remove-kit","composition-configure","composition-enable","composition-plan","play","play-input","pause","resume","play-tick","stop","runtime-preview","build-targets","build-inspect","build-plan","build-apply"]);
-      if(workbenchMethods.has(message.method)){const result=await workbench.execute(message.method,message.params??{});json(response,{id:message.id,ok:true,result});return;}
-      json(response,await routeAuthoringCommand(host,message));return;
-    }
-    json(response,{ok:false,error:{message:"Route not found."}},404);
-  }catch(error){json(response,{ok:false,error:authoringErrorRecord(error)},400);}});
-  server.on("connection",socket=>{clients.add(socket);socket.on("close",()=>clients.delete(socket));});
-  await new Promise((resolve,reject)=>{server.once("error",reject);server.listen(port,"127.0.0.1",resolve);});url=`http://127.0.0.1:${server.address().port}`;
-  return {url,server,async close(){closing=true;workbench.play.stop();for(const socket of clients)socket.destroy();await new Promise(resolve=>server.close(resolve));if(ownsHost)await host.close({save:true});},get host(){return host;},get workbench(){return workbench;},getArtifact:preview};
+      if (request.method === "POST" && path === "/api") {
+        if (readOnly) throw editorError("AUTHORING_READ_ONLY", "This viewer does not accept commands.");
+        const message = await receive(request);
+        // All commands share one ordered session. There is no duplicate endpoint implementation.
+        const job = tail.then(() => session.execute(message.method, message.params)); tail = job.catch(() => {});
+        return json(response, { id: message.id, ok: true, result: await job });
+      }
+      json(response, { ok: false, error: { message: "Route not found." } }, 404);
+    } catch (error) { json(response, { ok: false, error: errorRecord(error) }, 400); }
+  });
+  server.on("connection", socket => { clients.add(socket); socket.on("close", () => clients.delete(socket)); });
+  await new Promise((done, reject) => { server.once("error", reject); server.listen(port, "127.0.0.1", done); });
+  url = `http://127.0.0.1:${server.address().port}`;
+  return { url, server, get host() { return session.host; }, get workbench() { return session.workbench; }, getArtifact: preview,
+    async close() { closing = true; await tail; await session.dispose(); for (const socket of clients) socket.destroy(); await new Promise(done => server.close(done)); if (ownsHost) await session.host.close({ save: true }); } };
 }

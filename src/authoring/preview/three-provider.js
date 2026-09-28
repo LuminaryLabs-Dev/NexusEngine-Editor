@@ -2,342 +2,128 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
-export function createAuthoringThreePreview({
-  canvas,
-  onSelect = () => {},
-  onTransform = () => {},
-}) {
-  const renderer = new THREE.WebGLRenderer({
-    canvas,
-    antialias: true,
-    preserveDrawingBuffer: true,
-    alpha: false,
-  });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+/** Rendering is disposable derived state. No Three object becomes an Authoring document. */
+export function createAuthoringThreePreview({ canvas, onSelect = () => {}, onTransform = () => {} }) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(globalThis.devicePixelRatio ?? 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  const scene = new THREE.Scene(),
-    camera = new THREE.PerspectiveCamera(40, 1, 0.01, 10000),
-    controls = new OrbitControls(camera, canvas),
-    gizmo = new TransformControls(camera, canvas);
-  scene.add(gizmo.getHelper());
-  let content = null,
-    mixer = null,
-    animations = [],
-    generation = 0,
-    view = null,
-    selected = null,
-    disposed = false,
-    playback = null,
-    gameCamera = null,
-    viewMode = "scene";
-  const textures = new Set(),
-    lighting = new THREE.Group();
-  scene.add(lighting);
-  controls.enableDamping = false;
-  controls.addEventListener("change", () => render());
-  gizmo.addEventListener("change", () => render());
-  gizmo.addEventListener(
-    "dragging-changed",
-    (event) => (controls.enabled = !event.value),
-  );
-  gizmo.addEventListener("mouseUp", () => {
-    if (selected)
-      onTransform({
-        id: selected.userData.sourceNodeId,
-        translation: selected.position.toArray(),
-        rotation: selected.quaternion.toArray(),
-        scale: selected.scale.toArray(),
-      });
-  });
-  function clear() {
-    gizmo.detach();
-    selected = null;
-    if (mixer && content) {
-      mixer.stopAllAction();
-      mixer.uncacheRoot(content);
-    }
-    if (content) {
-      scene.remove(content);
-      const geometries = new Set(),
-        materials = new Set();
-      content.traverse((object) => {
-        if (object.geometry) geometries.add(object.geometry);
-        for (const material of (Array.isArray(object.material)
-          ? object.material
-          : [object.material]
-        ).filter(Boolean)) {
-          materials.add(material);
-          for (const value of Object.values(material))
-            if (value?.isTexture) textures.add(value);
-        }
-        object.skeleton?.dispose?.();
-      });
-      geometries.forEach((g) => g.dispose());
-      materials.forEach((m) => m.dispose());
-      textures.forEach((t) => {
-        t.image?.close?.();
-        t.dispose();
-      });
-      textures.clear();
-    }
-    content = null;
-    gameCamera = null;
-    mixer = null;
-    animations = [];
-  }
-  function render() {
-    if (disposed || !view) return;
-    renderer.render(scene, viewMode === "game" && gameCamera ? gameCamera : camera);
-  }
-  function configure(next) {
-    view = next;
-    scene.background = new THREE.Color().fromArray(next.background);
-    renderer.toneMappingExposure = next.exposure;
-    renderer.setSize(next.width, next.height, false);
-    camera.aspect = next.width / next.height;
-    lighting.traverse((o) => o.shadow?.dispose());
-    lighting.clear();
-    for (const descriptor of next.lights) {
-      const color = new THREE.Color().fromArray(descriptor.color),
-        light =
-          descriptor.kind === "ambient"
-            ? new THREE.AmbientLight(color, descriptor.intensity)
-            : new THREE.DirectionalLight(color, descriptor.intensity);
-      if (descriptor.position) light.position.fromArray(descriptor.position);
-      light.castShadow = descriptor.castsShadow;
-      if (light.shadow) {
-        light.shadow.mapSize.set(2048, 2048);
-        light.shadow.camera.left = -10;
-        light.shadow.camera.right = 10;
-        light.shadow.camera.top = 10;
-        light.shadow.camera.bottom = -10;
-        light.shadow.bias = -0.0003;
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(40, 1, .01, 10000);
+  camera.position.set(4, 3, 6); camera.lookAt(0, 0, 0);
+  const controls = new OrbitControls(camera, canvas), gizmo = new TransformControls(camera, canvas);
+  const grid = new THREE.GridHelper(20, 20), lighting = new THREE.Group();
+  scene.add(grid, lighting, gizmo.getHelper());
+  scene.background = new THREE.Color(.035, .045, .065);
+  let content = null, gameCamera = null, selected = null, mixer = null, animations = [], viewMode = "scene", generation = 0, disposed = false, animationFrame = null;
+  let width = 1, height = 1, configuredCamera = null;
+  function render() { if (!disposed) renderer.render(scene, viewMode === "game" && gameCamera ? gameCamera : camera); }
+  function release(root) {
+    if (!root) return;
+    const geometries = new Set(), materials = new Set(), textures = new Set(), skeletons = new Set();
+    root.traverse(o => {
+      if (o.geometry) geometries.add(o.geometry);
+      if (o.skeleton) skeletons.add(o.skeleton);
+      for (const material of (Array.isArray(o.material) ? o.material : [o.material]).filter(Boolean)) {
+        materials.add(material); Object.values(material).filter(v => v?.isTexture).forEach(v => textures.add(v));
       }
-      lighting.add(light);
+      o.shadow?.dispose?.();
+    });
+    textures.forEach(t => { t.image?.close?.(); t.dispose(); }); materials.forEach(m => m.dispose());
+    geometries.forEach(g => g.dispose()); skeletons.forEach(s => s.dispose());
+  }
+  function stop() { if (animationFrame !== null) cancelAnimationFrame(animationFrame); animationFrame = null; }
+  function clear() {
+    stop(); gizmo.detach(); selected = null;
+    if (mixer && content) { mixer.stopAllAction(); mixer.uncacheRoot(content); }
+    if (content) { scene.remove(content); release(content); }
+    content = null; gameCamera = null; mixer = null; animations = [];
+  }
+  function resize(w, h) {
+    width = Math.max(1, w); height = Math.max(1, h); renderer.setSize(width, height, false);
+    camera.aspect = width / height; camera.updateProjectionMatrix();
+    if (gameCamera?.isPerspectiveCamera) { gameCamera.aspect = width / height; gameCamera.updateProjectionMatrix(); }
+    render();
+  }
+  function configure(view) {
+    configuredCamera = view.camera ?? null;
+    scene.background.fromArray(view.background ?? [.035, .045, .065]); renderer.toneMappingExposure = view.exposure ?? 1;
+    release(lighting); lighting.clear();
+    for (const d of view.lights ?? []) {
+      const color = new THREE.Color().fromArray(d.color);
+      const light = d.kind === "ambient" ? new THREE.AmbientLight(color, d.intensity) : new THREE.DirectionalLight(color, d.intensity);
+      if (d.position) light.position.fromArray(d.position);
+      light.castShadow = Boolean(d.castsShadow); lighting.add(light);
     }
-    camera.updateProjectionMatrix();
+    resize(view.width ?? width, view.height ?? height);
   }
   function frame() {
     if (!content) return;
-    const bounds = new THREE.Box3().setFromObject(content),
-      center = bounds.getCenter(new THREE.Vector3()),
-      size = bounds.getSize(new THREE.Vector3()),
-      radius = Math.max(size.length() / 2, 0.1);
-    if (view.camera) {
-      camera.position.fromArray(view.camera.position);
-      controls.target.fromArray(view.camera.target);
-      camera.fov = THREE.MathUtils.radToDeg(view.camera.yfov ?? Math.PI / 4);
-    } else {
-      camera.position
-        .copy(center)
-        .add(
-          new THREE.Vector3(1, 0.65, 1.35)
-            .normalize()
-            .multiplyScalar(radius * 3.1),
-        );
-      controls.target.copy(center);
+    const box = new THREE.Box3().setFromObject(content), center = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, .1);
+    camera.position.copy(center).add(new THREE.Vector3(1, .65, 1.35).normalize().multiplyScalar(radius * 3.1));
+    controls.target.copy(center);
+    if (configuredCamera) {
+      camera.position.fromArray(configuredCamera.position);
+      controls.target.fromArray(configuredCamera.target);
+      camera.fov = THREE.MathUtils.radToDeg(configuredCamera.yfov ?? Math.PI / 4);
     }
-    camera.near = Math.max(radius / 1000, 0.001);
-    camera.far = radius * 100;
-    camera.updateProjectionMatrix();
-    camera.lookAt(controls.target);
-    controls.update();
-    render();
+    camera.near = Math.max(radius / 1000, .001); camera.far = Math.max(radius * 100, 100);
+    camera.updateProjectionMatrix(); controls.update(); render();
   }
-  async function load(url, nextView, { preserveCamera = false } = {}) {
+  async function load(url, view, { preserveCamera = false } = {}) {
     const token = ++generation;
     const gltf = await new GLTFLoader().loadAsync(url);
-    if (disposed || token !== generation) {
-      gltf.scene.traverse((o) => {
-        o.geometry?.dispose();
-        for (const m of (Array.isArray(o.material)
-          ? o.material
-          : [o.material]
-        ).filter(Boolean)) {
-          for (const value of Object.values(m))
-            if (value?.isTexture) {
-              value.image?.close?.();
-              value.dispose();
-            }
-          m.dispose();
-        }
-        o.skeleton?.dispose?.();
-      });
-      return { stale: true };
-    }
-    clear();
-    configure(nextView);
-    content = gltf.scene;
-    gameCamera = gltf.cameras?.[0] ?? null;
-    content.traverse((o) => {
-      if (o.isMesh) {
-        o.castShadow = true;
-        o.receiveShadow = true;
-      }
-    });
-    scene.add(content);
-    content.updateMatrixWorld(true);
-    mixer = new THREE.AnimationMixer(content);
-    animations = gltf.animations;
-    if (!preserveCamera) frame();
-    else render();
-    return { stale: false, statistics: inspect() };
+    if (disposed || token !== generation) { release(gltf.scene); return { stale: true }; }
+    clear(); configure(view); content = gltf.scene; gameCamera = gltf.cameras?.[0] ?? null;
+    content.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(content); content.updateMatrixWorld(true); mixer = new THREE.AnimationMixer(content); animations = gltf.animations;
+    resize(width, height); if (!preserveCamera) frame(); render(); return { stale: false, statistics: inspect() };
+  }
+  function select(id) {
+    selected = null; content?.traverse(o => { if (o.userData.sourceNodeId === id) selected ??= o; });
+    if (selected && viewMode === "scene") gizmo.attach(selected); else gizmo.detach(); render();
+  }
+  function setViewMode(mode = "scene") {
+    if (!["scene", "game"].includes(mode)) throw new TypeError("Unknown viewport mode.");
+    if (mode === "game" && !gameCamera) throw Object.assign(new Error("Add an authored camera before using Game View."), { code: "EDITOR_GAME_CAMERA_MISSING" });
+    viewMode = mode; controls.enabled = mode === "scene"; grid.visible = mode === "scene"; lighting.visible = mode === "scene";
+    if (mode === "game") gizmo.detach(); else if (selected) gizmo.attach(selected); render(); return mode;
   }
   function inspect() {
     const meshes = [];
-    content?.traverse((o) => {
-      if (o.isMesh)
-        meshes.push({
-          name: o.name,
-          vertices: o.geometry.getAttribute("position")?.count ?? 0,
-          skinned: Boolean(o.isSkinnedMesh),
-          joints: o.skeleton?.bones.length ?? 0,
-          morphs: o.morphTargetInfluences?.length ?? 0,
-          materials: (Array.isArray(o.material)
-            ? o.material
-            : [o.material]
-          ).map((m) => ({
-            name: m.name,
-            color: m.color?.toArray(),
-            roughness: m.roughness,
-            metalness: m.metalness,
-            baseTexture: Boolean(m.map),
-            normalTexture: Boolean(m.normalMap),
-          })),
-        });
-    });
-    return {
-      meshes,
-      animations: animations.map((a) => ({
-        name: a.name,
-        duration: a.duration,
-        tracks: a.tracks.length,
-      })),
-      bounds: content
-        ? new THREE.Box3()
-            .setFromObject(content)
-            .getSize(new THREE.Vector3())
-            .toArray()
-        : [0, 0, 0],
-      renderer: renderer.info.render,
-      memory: renderer.info.memory,
-      camera: {
-        position: camera.position.toArray(),
-        target: controls.target.toArray(),
-        yfov: THREE.MathUtils.degToRad(camera.fov),
-      },
-    };
+    content?.traverse(o => { if (o.isMesh) meshes.push({ name: o.name, vertices: o.geometry.getAttribute("position")?.count ?? 0,
+      triangles: (o.geometry.index?.count ?? o.geometry.getAttribute("position")?.count ?? 0) / 3,
+      skinned: Boolean(o.isSkinnedMesh), joints: o.skeleton?.bones.length ?? 0, morphs: o.morphTargetInfluences?.length ?? 0,
+      materials: (Array.isArray(o.material) ? o.material : [o.material]).map(m => ({ name: m.name, color: m.color?.toArray(), roughness: m.roughness, metalness: m.metalness, baseTexture: Boolean(m.map), normalTexture: Boolean(m.normalMap) })) }); });
+    return { meshes, animations: animations.map(a => ({ name: a.name, duration: a.duration, tracks: a.tracks.length })),
+      bounds: content ? new THREE.Box3().setFromObject(content).getSize(new THREE.Vector3()).toArray() : [0, 0, 0],
+      renderer: { ...renderer.info.render }, memory: { ...renderer.info.memory }, viewMode, hasGameCamera: Boolean(gameCamera),
+      camera: { position: camera.position.toArray(), target: controls.target.toArray(), yfov: THREE.MathUtils.degToRad(camera.fov) } };
   }
-  const pointer = (event) => {
-    if (viewMode === "game" || gizmo.dragging || event.button !== 0 || !content) return;
-    const rect = canvas.getBoundingClientRect(),
-      raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(
-      new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        (-(event.clientY - rect.top) / rect.height) * 2 + 1,
-      ),
-      camera,
-    );
-    const hit = raycaster
-      .intersectObject(content, true)
-      .find((hit) => hit.object.isMesh);
-    if (hit) {
-      let object = hit.object;
-      while (object && !object.userData.sourceNodeId) object = object.parent;
-      if (object) onSelect(object.userData.sourceNodeId);
-    }
-  };
+  function sample(index, time) {
+    if (!mixer || !animations[index]) throw new Error("Animation clip is unavailable.");
+    mixer.stopAllAction(); const action = mixer.clipAction(animations[index]); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play(); mixer.setTime(time); content.updateMatrixWorld(true); render(); return inspect();
+  }
+  function pointer(e) {
+    if (viewMode === "game" || gizmo.dragging || e.button !== 0 || !content) return;
+    const rect = canvas.getBoundingClientRect(), ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(2 * (e.clientX - rect.left) / rect.width - 1, 1 - 2 * (e.clientY - rect.top) / rect.height), camera);
+    let object = ray.intersectObject(content, true).find(x => x.object.isMesh)?.object;
+    while (object && !object.userData.sourceNodeId) object = object.parent;
+    if (object) onSelect(object.userData.sourceNodeId);
+  }
   canvas.addEventListener("pointerdown", pointer);
-  return {
-    load,
-    inspect,
-    render,
-    frame,
-    clear() {
-      this.stop();
-      generation++;
-      clear();
-      render();
-    },
-    resize(width, height) {
-      if (view) {
-        view = { ...view, width, height };
-        renderer.setSize(width, height, false);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        if (gameCamera?.isPerspectiveCamera) { gameCamera.aspect = width / height; gameCamera.updateProjectionMatrix(); }
-        render();
-      }
-    },
-    setViewMode(mode = "scene") {
-      viewMode = mode === "game" ? "game" : "scene";
-      controls.enabled = viewMode === "scene";
-      if (viewMode === "game") gizmo.detach();
-      render();
-      return viewMode;
-    },
-    select(id) {
-      if (!content || viewMode === "game") return;
-      let target = null;
-      content.traverse((o) => {
-        if (o.userData.sourceNodeId === id && !o.isMesh) target ??= o;
-      });
-      selected = target;
-      if (target) gizmo.attach(target);
-      else gizmo.detach();
-      render();
-    },
-    setMode: (mode) => gizmo.setMode(mode),
-    sample(clipIndex, time) {
-      if (!mixer || !animations[clipIndex])
-        throw Error("Animation clip is unavailable.");
-      mixer.stopAllAction();
-      const action = mixer.clipAction(animations[clipIndex]);
-      action.setLoop(THREE.LoopOnce, 1);
-      action.clampWhenFinished = true;
-      action.play();
-      mixer.setTime(time);
-      content.updateMatrixWorld(true);
-      render();
-      return inspect();
-    },
-    play(clipIndex = 0) {
-      this.stop();
-      if (!animations[clipIndex]) throw Error("Animation clip is unavailable.");
-      const start = performance.now(),
-        duration = animations[clipIndex].duration;
-      const tick = () => {
-        this.sample(
-          clipIndex,
-          ((performance.now() - start) / 1000) % Math.max(duration, 0.001),
-        );
-        playback = requestAnimationFrame(tick);
-      };
-      tick();
-    },
-    stop() {
-      if (playback !== null) cancelAnimationFrame(playback);
-      playback = null;
-    },
-    dispose() {
-      if (disposed) return;
-      this.stop();
-      generation++;
-      clear();
-      controls.dispose();
-      gizmo.dispose();
-      canvas.removeEventListener("pointerdown", pointer);
-      lighting.traverse((o) => o.shadow?.dispose());
-      renderer.dispose();
-      renderer.forceContextLoss();
-      disposed = true;
-    },
-    get objects() {
-      return content;
-    },
+  controls.addEventListener("change", render); gizmo.addEventListener("change", render);
+  gizmo.addEventListener("dragging-changed", e => { controls.enabled = !e.value && viewMode === "scene"; });
+  gizmo.addEventListener("mouseUp", () => { if (selected && viewMode === "scene") onTransform({ id: selected.userData.sourceNodeId, translation: selected.position.toArray(), rotation: selected.quaternion.toArray(), scale: selected.scale.toArray() }); });
+  resize(canvas.clientWidth || 640, canvas.clientHeight || 480);
+  return { load, inspect, render, frame, resize, select, sample, stop, setViewMode,
+    updateTransforms(nodes) { const map = new Map(nodes.map(n => [n.id, n.transform])); content?.traverse(o => { const t = map.get(o.userData.sourceNodeId); if (t) { o.position.fromArray(t.translation); o.quaternion.fromArray(t.rotation); o.scale.fromArray(t.scale); } }); content?.updateMatrixWorld(true); render(); },
+    clear() { generation++; clear(); viewMode = "scene"; grid.visible = true; lighting.visible = true; controls.enabled = true; render(); },
+    setMode: mode => gizmo.setMode(mode),
+    play(index = 0) { if (!animations[index]) throw new Error("Animation clip is unavailable."); stop(); const start = performance.now(); const run = () => { sample(index, ((performance.now() - start) / 1000) % Math.max(animations[index].duration, .001)); animationFrame = requestAnimationFrame(run); }; run(); },
+    dispose() { if (disposed) return; generation++; clear(); controls.dispose(); gizmo.dispose(); release(grid); release(lighting); canvas.removeEventListener("pointerdown", pointer); renderer.dispose(); renderer.forceContextLoss(); disposed = true; },
+    get objects() { return content; },
   };
 }

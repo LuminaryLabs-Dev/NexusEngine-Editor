@@ -11,3 +11,4 @@ output/playwright/
 .agent/mcp-output/
 *.trace.zip
 *.webm
+.test-results/

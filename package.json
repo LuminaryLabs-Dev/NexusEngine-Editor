@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Static NexusEngine web editor shell for building DSK-driven games as HTML files.",
+  "description": "Shared Core-native workbench with browser and local-host adapters; sandbox-built static deployment.",
   "exports": {
     "./headless": "./src/headless/index.js",
     "./adapters/node-mcp-sdk": "./src/adapters/node-mcp-sdk-adapter.js",
@@ -29,7 +29,7 @@
     "mcp:game": "node examples/mcp-game-runtime.mjs",
     "smoke:intent": "node scripts/intent-smoke.mjs",
     "smoke:playwright": "node tests/playwright-editor-smoke.mjs",
-    "test": "npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run test:static-browser && npm run build && npm run smoke:playwright",
+    "test": "npm run test:consolidation && npm run test:headless && npm run test:authoring && npm run smoke:intent && npm run build && npm run test:static-browser && npm run smoke:playwright",
     "test:headless": "node tests/headless-strict.mjs",
     "authoring": "node scripts/nexus-authoring.mjs",
     "test:authoring": "node tests/run-authoring.mjs",
@@ -37,7 +37,10 @@
     "test:workbench": "node tests/authoring-workbench.mjs",
     "test:game-workflow": "node tests/authoring-game-workflow.mjs",
     "publish:root": "node scripts/publish-static-root.mjs",
-    "test:static-browser": "node tests/static-browser-workbench.mjs"
+    "test:static-browser": "node tests/static-browser-workbench.mjs",
+    "test:consolidation": "node --test tests/workbench-consolidation.test.mjs tests/workbench-repair.test.mjs",
+    "doctor": "node scripts/dependency-doctor.mjs full",
+    "test:repair": "node --test tests/workbench-repair.test.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

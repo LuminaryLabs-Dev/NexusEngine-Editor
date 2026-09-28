@@ -1,244 +1,145 @@
-import { createEngine, NEXUS_ENGINE_VERSION } from "nexusengine";
+import { createCommandQueue } from "./command-queue.js";
+import { createEngine, NEXUS_ENGINE_VERSION, CORE_REGISTRY_SHA256 } from "nexusengine";
 import { createAuthoringDomain } from "nexusengine/domains/authoring";
-import { createEditorWorkbench } from "./index.js";
+import { createEditorWorkbench } from "./controller.js";
+import { disposeAuthoringRuntime } from "./play-controller.js";
+import { capabilitiesFor, editorError, HOST_SCHEMA, assertSourceCommandAllowed } from "./host-contract.js";
+import { CORE_IDENTITY } from "./core-identity.js";
+export const BROWSER_CORE_COMMIT = CORE_IDENTITY.commit;
+export const BROWSER_CORE_REGISTRY = CORE_IDENTITY.registryHash;
+const view = { width: 1280, height: 800, background: [.035, .045, .065], exposure: 1, camera: null,
+  lights: [{ id: "key", kind: "directional", color: [1, .91, .8], intensity: 4, position: [4, 6, 5], castsShadow: true },
+    { id: "ambient", kind: "ambient", color: [1, 1, 1], intensity: .65, castsShadow: false }] };
+const contextKey = c => JSON.stringify([c.projectId, c.epoch, c.clock]);
 
-export const BROWSER_CORE_COMMIT = "784e514722febf8fb09ca55a058b2736e93679bd";
-export const BROWSER_CORE_REGISTRY = "sha256:3b520f699299e0f8bc4fdab8a4b2297c823d94b22dbee30ee250d873e39cd30e";
 
-const copy = (value) => structuredClone(value);
-const fail = (code, message, details = {}) => Object.assign(new Error(message), { code, details });
-const requestId = () => crypto.randomUUID();
-const defaultView = Object.freeze({
-  schema: "nexusengine.authoring-view/1",
-  width: 1280,
-  height: 800,
-  background: [0.035, 0.045, 0.065],
-  exposure: 1,
-  camera: null,
-  lights: [
-    { id: "key", kind: "directional", color: [1, 0.91, 0.8], intensity: 4, position: [4, 6, 5], castsShadow: true },
-    { id: "fill", kind: "directional", color: [0.65, 0.78, 1], intensity: 1.5, position: [-4, 2, 1], castsShadow: false },
-    { id: "ambient", kind: "ambient", color: [1, 1, 1], intensity: 0.65, castsShadow: false }
-  ]
-});
-
-export async function createBrowserWorkbenchHost({
-  projectId = "browser-project",
-  projectKey = localStorage.getItem("nexusengine-editor:last-project") || "default",
-  assemblyId = "scene",
-} = {}) {
-  let generation = 0;
-  let dirty = false;
-  let runtime = null;
-  let workbench = null;
-  let host = null;
-  let key = String(projectKey || "default");
-
-  function makeRuntime() {
-    workbench?.play?.stop?.();
-    const engine = createEngine({ kits: createAuthoringDomain({ project: { projectId } }) });
-    const project = engine.n.authoringProject;
-    const adapter = {
-      engine,
-      requestId,
-      read: (id) => project.getDocument(id),
-      list: (kind) => project.listDocuments(kind),
-      snapshot: (options) => project.getSnapshot(options),
-      status: () => ({ state: "ready", generation, dirty, projectKey: key, context: project.context(), kitIds: engine.kits.map((kit) => kit.id) }),
-      command: async (input) => { const receipt = project.execute(input); dirty = true; return receipt; },
-      commitImport: async (plan) => { const receipt = engine.n.authoringImport.commit(plan); dirty = true; return receipt; },
-    };
-    runtime = { engine, project, adapter };
-    workbench = createEditorWorkbench(adapter, { build: false });
-    host = adapter;
-    return runtime;
+export async function createBrowserWorkbenchHost({ projectId = "browser-project", projectKey,
+  assemblyId = "scene", storage = "indexeddb", restore = true, preferences = undefined,
+  runtimeFactory = options => createEngine({ kits: createAuthoringDomain(options) }) } = {}) {
+  if (!['indexeddb', 'memory'].includes(storage)) throw editorError("EDITOR_STORAGE", "Browser host supports only Core IndexedDB and memory storage.");
+  if (`sha256:${CORE_REGISTRY_SHA256}` !== CORE_IDENTITY.registryHash) throw editorError("EDITOR_CORE_IDENTITY", "Installed Core registry differs from the pinned package identity.");
+  if (preferences === undefined) { try { preferences = globalThis.localStorage; } catch { preferences = null; } }
+  const prefGet = key => { try { return preferences?.getItem(key); } catch { return null; } };
+  const prefSet = (key, value) => { try { preferences?.setItem(key, value); } catch { /* Preferences are optional; project persistence is not. */ } };
+  let key = projectKey ?? prefGet("nexusengine-editor:last-project") ?? "default";
+  let activeAssembly = assemblyId, generation = 0, savedContext = null, closed = false, runtime;
+  const requestId = () => crypto.randomUUID();
+  function makeRuntime(id) {
+    const engine = runtimeFactory({ project: { projectId: id } }), project = engine.n.authoringProject;
+    const adapter = { engine, requestId, list: kind => project.listDocuments(kind), read: id => project.getDocument(id),
+      snapshot: options => project.getSnapshot(options), status: () => ({ context: project.context() }),
+      command: async request => project.execute(request), commitImport: async plan => engine.n.authoringImport.commit(plan) };
+    return { engine, project, workbench: createEditorWorkbench(adapter, { build: false }) };
   }
-
-  makeRuntime();
-
-  async function ensureComposition() {
-    const existed = runtime.project.listDocuments("domain-composition").some((document) => document.id === "project-composition");
-    try {
-      await workbench.execute("composition-ensure");
-      if (!existed) dirty = true;
-    } catch (error) {
-      if (error?.code !== "AUTHORING_REQUEST_CONFLICT") throw error;
-    }
+  runtime = makeRuntime(projectId);
+  function assertOpen() { if (closed) throw editorError("EDITOR_HOST_CLOSED", "Editor host is disposed."); }
+  function status() {
+    return { state: closed ? "closed" : "ready", generation,
+      dirty: contextKey(runtime.project.context()) !== savedContext,
+      projectKey: key, context: runtime.project.context(), kitIds: runtime.engine.kits.map(k => k.id),
+      runtime: { runtime: "nexusengine-browser", version: NEXUS_ENGINE_VERSION, coreCommit: CORE_IDENTITY.commit } };
   }
-
-  async function save() {
-    const receipt = await runtime.engine.n.authoringPersistence.save({
-      requestId: requestId(),
-      target: { storage: "indexeddb", path: key },
-      expectedGeneration: generation,
-    });
-    generation = receipt.generation;
-    dirty = false;
-    localStorage.setItem("nexusengine-editor:last-project", key);
-    return receipt;
+  function chooseAssembly(id = activeAssembly) {
+    const assemblies = runtime.project.listDocuments("assembly");
+    activeAssembly = assemblies.some(a => a.id === id) ? id : (assemblies[0]?.id ?? "scene");
   }
-
-  async function load() {
-    const receipt = await runtime.engine.n.authoringPersistence.load({
-      source: { storage: "indexeddb", path: key },
-    });
-    generation = receipt.generation;
-    dirty = false;
-    localStorage.setItem("nexusengine-editor:last-project", key);
-    return receipt;
-  }
-
-  async function newProject(nextKey = `project-${Date.now()}`) {
-    key = String(nextKey || `project-${Date.now()}`);
-    generation = 0;
-    dirty = false;
-    makeRuntime();
-    await ensureComposition();
-    localStorage.setItem("nexusengine-editor:last-project", key);
-    return state();
-  }
-
-  async function openProject(nextKey) {
-    if (!nextKey) throw fail("EDITOR_PROJECT_KEY", "A browser project key is required.");
-    key = String(nextKey);
-    generation = 0;
-    dirty = false;
-    makeRuntime();
-    await load();
-    await ensureComposition();
-    return state();
-  }
-
-  async function exportArtifact({ format = "glb", assemblyId: requestedAssembly = assemblyId } = {}) {
-    return runtime.engine.n.authoringExport.export({
-      requestId: requestId(),
-      assemblyId: requestedAssembly,
-      format,
-    });
-  }
-
-  async function preview({ play = false } = {}) {
-    if (play) return workbench.play.preview({ format: "glb" });
-    return exportArtifact({ format: "glb" });
-  }
-
   function state() {
-    const documents = runtime.project.listDocuments();
-    let assembly = null;
-    try { assembly = runtime.project.getDocument(assemblyId); } catch {}
-    const validation = runtime.engine.n.authoringValidation.project();
-    return Object.freeze({
-      schema: "nexusengine.editor-browser-state/1",
-      status: {
-        state: "ready",
-        generation,
-        dirty,
-        projectKey: key,
-        context: runtime.project.context(),
-        runtime: { runtime: "nexusengine-browser", version: NEXUS_ENGINE_VERSION, coreCommit: BROWSER_CORE_COMMIT },
-        kitIds: runtime.engine.kits.map((kit) => kit.id),
-      },
-      documents,
-      assemblyId,
-      assembly,
-      view: copy(defaultView),
-      validation,
-      exportFormats: runtime.engine.n.authoringExport.formats(),
-      importFormats: runtime.engine.n.authoringImport.formats(),
-      browserCapabilities: {
-        persistence: "indexeddb",
-        import: true,
-        export: true,
-        play: true,
-        build: "requires-local-host",
-        buildTargets: ["web-static", "web-live", "pcvr", "android-xr", "openxr"],
-      },
-      workbench: workbench.state(),
-    });
+    assertOpen(); chooseAssembly();
+    const hasAssembly = runtime.project.listDocuments("assembly").some(d => d.id === activeAssembly);
+    return { schema: HOST_SCHEMA, status: status(), documents: runtime.project.listDocuments(),
+      assemblyId: activeAssembly, assembly: hasAssembly ? runtime.project.getDocument(activeAssembly) : null,
+      view: structuredClone(view), validation: runtime.engine.n.authoringValidation.project(),
+      importFormats: runtime.engine.n.authoringImport.formats(), exportFormats: runtime.engine.n.authoringExport.formats(),
+      capabilities: capabilitiesFor("browser", { persistent: storage === "indexeddb", storage }), workbench: runtime.workbench.state() };
   }
-
-  async function execute(method, params = {}) {
+  async function loadKey(nextKey) {
+    if (typeof nextKey !== "string" || !nextKey.trim()) throw editorError("EDITOR_PROJECT_KEY", "A project key is required.");
+    // Read through Core, discover project identity, and load into a candidate runtime before swapping.
+    const target = { storage, path: nextKey };
+    const bundle = await runtime.engine.n.authoringStorageRegistry.get(storage).read(target);
+    const candidate = makeRuntime(bundle.projectId);
+    try {
+      const receipt = await candidate.engine.n.authoringPersistence.load({ source: target });
+      runtime.workbench.play.stop(); disposeAuthoringRuntime(runtime.engine);
+      runtime = candidate; key = nextKey; generation = receipt.generation;
+      savedContext = contextKey(runtime.project.context()); chooseAssembly(prefGet(`nexusengine-editor:assembly:${key}`) ?? assemblyId);
+      prefSet("nexusengine-editor:last-project", key); return receipt;
+    } catch (error) { disposeAuthoringRuntime(candidate.engine); throw error; }
+  }
+  async function dispatch(method, p = {}) {
+    assertOpen();
+    assertSourceCommandAllowed(method, runtime.workbench.play.status().state);
+    const engine = runtime.engine, project = runtime.project;
     switch (method) {
-      case "status": return state().status;
+      case "status": return status();
       case "state": return state();
-      case "list": return runtime.project.listDocuments(params.kind);
-      case "read": return runtime.project.getDocument(params.id);
-      case "create": {
-        const result = runtime.engine.n.authoringCreate.create(params);
-        dirty = true;
-        return result;
+      case "list": return project.listDocuments(p.kind);
+      case "read": return project.getDocument(p.id);
+      case "create": return engine.n.authoringCreate.create(p);
+      case "execute": return project.execute(p);
+      case "undo": return project.undo(p);
+      case "redo": return project.redo(p);
+      case "save": {
+        const receipt = await engine.n.authoringPersistence.save({ requestId: requestId(), target: { storage, path: key }, expectedGeneration: generation });
+        generation = receipt.generation; savedContext = contextKey(receipt.source);
+        prefSet("nexusengine-editor:last-project", key); prefSet(`nexusengine-editor:assembly:${key}`, activeAssembly); return receipt;
       }
-      case "execute": {
-        const result = runtime.project.execute(params);
-        dirty = true;
-        return result;
+      case "load": return loadKey(key);
+      case "new-project": {
+        if (typeof p.key !== "string" || !p.key.trim()) throw editorError("EDITOR_PROJECT_KEY", "A project key is required.");
+        try {
+          await engine.n.authoringStorageRegistry.get(storage).read({ storage, path: p.key });
+          throw editorError("EDITOR_PROJECT_EXISTS", "This project key is already saved. Open it or choose a new key.");
+        } catch (error) { if (error.code !== "AUTHORING_STORAGE_MISSING") throw error; }
+        const candidate = makeRuntime(projectId);
+        try { await candidate.workbench.composition.ensure(); }
+        catch (error) { disposeAuthoringRuntime(candidate.engine); throw error; }
+        runtime.workbench.play.stop(); disposeAuthoringRuntime(engine);
+        runtime = candidate; key = p.key; generation = 0; savedContext = null; activeAssembly = "scene";
+        return state();
       }
-      case "undo": { const result = runtime.project.undo(params); dirty = true; return result; }
-      case "redo": { const result = runtime.project.redo(params); dirty = true; return result; }
-      case "save": return save();
-      case "load": return load();
-      case "new-project": return newProject(params.key);
-      case "open-project": return openProject(params.key);
-      case "validate-project": return runtime.engine.n.authoringValidation.project();
-      case "validate-document": return runtime.engine.n.authoringValidation.document(params.id);
-      case "validate-export": return runtime.engine.n.authoringValidation.format(params);
-      case "import-formats": return runtime.engine.n.authoringImport.formats();
+      case "open-project": return loadKey(p.key);
+      case "select-assembly": {
+        const doc = project.getDocument(p.id); if (doc.kind !== "assembly") throw editorError("EDITOR_ASSEMBLY", "Select an assembly document.");
+        activeAssembly = doc.id; return state();
+      }
+      case "validate-project": return engine.n.authoringValidation.project();
+      case "validate-document": return engine.n.authoringValidation.document(p.id);
+      case "validate-export": return engine.n.authoringValidation.format({ ...p, assemblyId: p.assemblyId ?? activeAssembly });
+      case "export-formats": return engine.n.authoringExport.formats();
+      case "import-formats": return engine.n.authoringImport.formats();
+      case "inspect-export": return engine.n.authoringExport.inspect({ ...p, assemblyId: p.assemblyId ?? activeAssembly });
+      case "export": return engine.n.authoringExport.export({ requestId: p.requestId ?? requestId(), assemblyId: p.assemblyId ?? activeAssembly, format: p.format ?? "glb", providerId: p.providerId });
       case "workbench-import-inspect":
-      case "import-inspect":
-        return runtime.engine.n.authoringImport.inspect({
-          requestId: params.requestId ?? requestId(),
-          format: params.format,
-          prefix: params.prefix ?? "import",
-          bytes: params.bytes,
-          resources: params.resources ?? {},
-          providerId: params.providerId,
-        });
+      case "import-inspect": return engine.n.authoringImport.inspect({ ...p, requestId: p.requestId ?? requestId(), prefix: p.prefix ?? "import", resources: p.resources ?? {} });
       case "workbench-import-commit":
       case "import-commit": {
-        const result = runtime.engine.n.authoringImport.commit(params.plan);
-        dirty = true;
-        return result;
+        const receipt = engine.n.authoringImport.commit(p.plan); chooseAssembly(receipt.assemblyId); return receipt;
       }
       case "import": {
-        const result = await runtime.engine.n.authoringImport.import({
-          requestId: params.requestId ?? requestId(),
-          format: params.format,
-          prefix: params.prefix ?? "import",
-          bytes: params.bytes,
-          resources: params.resources ?? {},
-          providerId: params.providerId,
-        });
-        dirty = true;
-        return result;
+        const receipt = await engine.n.authoringImport.import({ ...p, requestId: p.requestId ?? requestId(), prefix: p.prefix ?? "import", resources: p.resources ?? {} });
+        chooseAssembly(receipt.assemblyId); return receipt;
       }
-      case "export-formats": return runtime.engine.n.authoringExport.formats();
-      case "inspect-export": return runtime.engine.n.authoringExport.inspect(params);
-      case "export": return exportArtifact(params);
-      case "build-targets":
-        return state().browserCapabilities.buildTargets.map((id) => ({ id, status: "requires-local-host", browser: false }));
-      case "build-plan":
-      case "build-apply":
-        throw fail("EDITOR_BUILD_REQUIRES_LOCAL_HOST", "Core Build execution uses local toolchains/process access. Export or open this project in the local Editor host to build.");
-      default: {
-        const result = await workbench.execute(method, params);
-        if (["composition-ensure","composition-add-kit","composition-remove-kit","composition-configure","composition-enable","create-validation-game"].includes(method)) dirty = true;
-        return result;
-      }
+      case "play": return runtime.workbench.play.start({ ...p, assemblyId: p.assemblyId ?? activeAssembly });
+      case "build-targets": return [];
+      default: return runtime.workbench.execute(method, p);
     }
   }
-
-  await ensureComposition();
-
-  return Object.freeze({
-    state,
-    execute,
-    preview,
-    save,
-    load,
-    newProject,
-    openProject,
-    get engine() { return runtime.engine; },
-    get project() { return runtime.project; },
-    get workbench() { return workbench; },
-  });
+  const queue = createCommandQueue(dispatch);
+  const execute = queue.execute;
+  async function preview({ play = false } = {}) {
+    if (queue.closing) throw editorError("EDITOR_HOST_CLOSED", "Editor host is closing.");
+    await queue.idle(); assertOpen();
+    return play ? runtime.workbench.play.preview() : runtime.engine.n.authoringExport.export({ assemblyId: activeAssembly, format: "glb" });
+  }
+  try {
+  await runtime.workbench.composition.ensure();
+  if (restore && prefGet("nexusengine-editor:last-project") === key) {
+    try { await loadKey(key); } catch (error) { if (error.code !== "AUTHORING_STORAGE_MISSING") throw error; }
+  }
+  } catch (error) { disposeAuthoringRuntime(runtime.engine); closed = true; throw error; }
+  return Object.freeze({ state, execute, preview, save: () => execute("save"), load: () => execute("load"),
+    newProject: key => execute("new-project", { key }), openProject: key => execute("open-project", { key }),
+    dispose() { return queue.close(() => { if (closed) return; runtime.workbench.play.stop(); disposeAuthoringRuntime(runtime.engine); closed = true; }); },
+    get engine() { return runtime.engine; }, get project() { return runtime.project; }, get workbench() { return runtime.workbench; } });
 }

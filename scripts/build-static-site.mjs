@@ -1,101 +1,60 @@
+import { requireDependencies } from "./dependency-doctor.mjs";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
-import { DEFAULT_DSK_GAME, buildDskGameHtml } from "../src/dsk-html-builder.js";
+import { dirname, resolve, relative } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { workbenchHtml } from "../src/workbench/shell.js";
+import { sha256, stable, walk, fileRecord, coreLocation, browserBoundaryPlugin, createBrowserFactorySource, verifyArtifact, assertBrowserInputs, prepareStagingPath } from "./static-build-support.mjs";
 
-const root = resolve(import.meta.dirname, "..");
-const dist = resolve(root, "dist");
-const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
-const sourceParent = process.env.NEXUS_EDITOR_SOURCE_COMMIT ?? gitHead();
-const coreCommit = pkg.nexusEngineArtifact.commit;
-const coreRegistry = pkg.nexusEngineArtifact.registryHash;
-const coreBase = `https://cdn.jsdelivr.net/gh/LuminaryLabs-Dev/NexusEngine@${coreCommit}/`;
-
-function gitHead() {
-  try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  } catch {
-    return "working-tree";
+export async function buildStaticSite({ root = resolve(dirname(fileURLToPath(import.meta.url)), ".."), out = "dist" } = {}) {
+  const destination = await prepareStagingPath(root, out);
+  await requireDependencies({ root, mode: "build" });
+  const esbuild = await import("esbuild");
+  const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  if (esbuild.version !== pkg.dependencies.esbuild) throw new Error("Build tool version differs from package.json.");
+  const coreRoot = coreLocation();
+  const { CORE_REGISTRY_SHA256 } = await import("nexusengine");
+  const { createEngineRegistrySnapshot } = await import("nexusengine/domains/composition");
+  if (`sha256:${CORE_REGISTRY_SHA256}` !== pkg.nexusEngineArtifact.registryHash) throw new Error("Installed Core registry differs from the pinned package.");
+  const sourceParent = process.env.NEXUS_EDITOR_SOURCE_COMMIT ?? execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  if (!/^[0-9a-f]{40}$/.test(sourceParent)) throw new Error("A verified source-parent commit is required.");
+  const registry = createEngineRegistrySnapshot();
+  const factory = await createBrowserFactorySource({ esbuild, root, coreRoot, registry });
+  for (const id of ["input-contract-kit", "body-state-kit", "box-shape-kit"]) if (factory.availability[id]?.status !== "available") throw new Error(`Required proof Kit ${id} did not link: ${JSON.stringify(factory.availability[id])}`);
+  await rm(destination, { recursive: true, force: true }); await mkdir(destination, { recursive: true });
+  const result = await esbuild.build({ absWorkingDir: root, entryPoints: { editor: "src/workbench/browser-client.js" },
+    outdir: destination, bundle: true, format: "esm", platform: "browser", target: "es2022", splitting: true,
+    chunkNames: "editor-assets/chunks/[name]-[hash]", assetNames: "editor-assets/[name]-[hash]", minify: true,
+    sourcemap: false, legalComments: "eof", metafile: true, logLevel: "silent",
+    plugins: [browserBoundaryPlugin(coreRoot, { resolverPath: resolve(root, "src/workbench/adapters/kit-factories.js"), resolverSource: factory.source })] });
+  if (result.warnings.length) throw new Error(`Bundle warnings must be resolved: ${result.warnings.map(w => w.text).join("; ")}`);
+  for (const output of Object.values(result.metafile.outputs)) if (output.imports.some(i => i.external)) throw new Error("Browser bundle contains external imports.");
+  assertBrowserInputs(Object.keys(result.metafile.inputs));
+  await mkdir(resolve(destination, "editor-assets"), { recursive: true });
+  await cp(resolve(root, "assets/favicon.svg"), resolve(destination, "editor-assets/favicon.svg"));
+  const thirdParty = await Promise.all([readFile(resolve(coreRoot, "LICENSE"), "utf8"), readFile(resolve(root, "node_modules/three/LICENSE"), "utf8")]);
+  await writeFile(resolve(destination, "editor-assets/THIRD-PARTY-NOTICES.txt"), thirdParty.join("\n\n"));
+  await writeFile(resolve(destination, "index.html"), workbenchHtml()); await writeFile(resolve(destination, ".nojekyll"), "");
+  const sourcePaths = new Set([...Object.keys(result.metafile.inputs), "package.json", "scripts/build-static-site.mjs", "scripts/static-build-support.mjs", "scripts/dependency-doctor.mjs", "package-lock.json", "src/workbench/shell.js", "assets/favicon.svg", "node_modules/three/LICENSE", relative(root, resolve(coreRoot, "LICENSE"))]);
+  const sources = [];
+  for (const path of [...sourcePaths].sort()) {
+    if (!path.includes(":")) sources.push(await fileRecord(root, path));
   }
+  const generatedFactoryHash = sha256(factory.source);
+  const sourceFingerprint = sha256(stable({ sources, generatedFactoryHash }));
+  const files = await Promise.all((await walk(destination)).map(path => fileRecord(destination, path)));
+  const deployment = { schema: "nexusengine-editor.deployment/3", deploymentMode: "sandbox-built-main-root", sourceParent,
+    coreCommit: pkg.nexusEngineArtifact.commit, coreRegistry: pkg.nexusEngineArtifact.registryHash,
+    compositionRegistry: registry.contentHash, bundler: { name: "esbuild", version: esbuild.version },
+    sources, generatedFactoryHash, sourceFingerprint, files, artifactFingerprint: sha256(stable(files)),
+    browserFactories: { included: Object.values(factory.availability).filter(x => x.status === "available").length,
+      unavailable: Object.entries(factory.availability).filter(([, x]) => x.status !== "available").map(([id, x]) => ({ id, ...x })) },
+    browserBoundaries: ["filesystem-storage: unavailable", "filesystem-artifact-publication: unavailable"], entry: "index.html" };
+  await writeFile(resolve(destination, "deployment.json"), stable(deployment));
+  await mkdir(resolve(root, ".test-results"), { recursive: true });
+  await writeFile(resolve(root, ".test-results/bundle-metafile.json"), stable(result.metafile));
+  await verifyArtifact(destination, { strict: true });
+  console.log(`Built ${files.length} browser deployment files; artifact ${deployment.artifactFingerprint}`);
+  return deployment;
 }
-
-const indexHtml = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="nexus-editor-source" content="${sourceParent}" />
-    <meta name="nexus-core-commit" content="${coreCommit}" />
-    <title>NexusEngine Editor</title>
-    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
-    <link rel="stylesheet" href="./editor.css" />
-    <script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-    "nexusengine": "${coreBase}src/index.js",
-    "nexusengine/foundation": "${coreBase}src/foundation/index.js",
-    "nexusengine/domains/authoring": "${coreBase}src/core-domains/authoring/index.js",
-    "nexusengine/domains/interaction/input": "${coreBase}src/core-domains/interaction/input/kits/input-kit/index.js",
-    "nexusengine/domains/composition": "${coreBase}src/core-domains/composition/index.js",
-    "nexusengine/domains/runtime/sequence": "${coreBase}src/core-domains/runtime/sequence/kits/sequence-kit/index.js",
-    "nexusengine/domains/spatial/quaternion-math": "${coreBase}src/core-domains/spatial/kits/quaternion-math-kit.js",
-    "nexusengine/domains/object": "${coreBase}src/core-domains/object/index.js",
-    "nexusengine/domains/asset/registry": "${coreBase}src/core-domains/asset/kits/asset-kit/index.js",
-    "nexusengine/domains/presentation/graphics": "${coreBase}src/core-domains/presentation/graphics/kits/graphics-kit/index.js",
-    "nexusengine/domains/build": "${coreBase}src/core-domains/build/index.js"
-  }
-}
-    </script>
-  </head>
-  <body>
-    <div class="app">
-      <div id="menus" class="row"></div>
-      <div id="toolbar" class="row"></div>
-      <div class="main">
-        <section class="panel"><div class="panel-title">OUTLINER</div><div id="outliner-list" class="scroll"></div></section>
-        <main class="viewport-wrap"><canvas id="viewport" aria-label="NexusEngine scene viewport"></canvas><div class="viewport-label">SCENE / GAME VIEW</div></main>
-        <section class="panel right"><div class="panel-title">INSPECTOR</div><div id="inspector-body" class="inspector"></div></section>
-        <section class="bottom">
-          <div id="bottom-tabs" class="tabs">
-            <button data-tab="assets" class="active">Assets</button><button data-tab="domains">Domains</button><button data-tab="kits">Kits</button>
-            <button data-tab="validation">Validation</button><button data-tab="composition">Composition</button><button data-tab="runtime">Runtime</button>
-            <button data-tab="build">Build</button><button data-tab="console">Console</button>
-          </div>
-          <div id="bottom-content"></div>
-        </section>
-      </div>
-      <div id="statusbar" class="status"></div>
-    </div>
-    <script type="module" src="./editor.js"></script>
-  </body>
-</html>
-`;
-const editorJs = `// Generated static Pages entry. Edit src/workbench/**, not this file.\nimport "./src/workbench/browser-client.js";\n`;
-const editorCss = `/* Generated static Pages entry. Edit src/workbench/browser.css, not this file. */\n@import url("./src/workbench/browser.css");\n`;
-
-await rm(dist, { recursive: true, force: true });
-await mkdir(resolve(dist, "games"), { recursive: true });
-await cp(resolve(root, "assets"), resolve(dist, "assets"), { recursive: true });
-await cp(resolve(root, "src"), resolve(dist, "src"), { recursive: true });
-await cp(resolve(root, "README.md"), resolve(dist, "README.md"));
-await writeFile(resolve(dist, "index.html"), indexHtml);
-await writeFile(resolve(dist, "editor.js"), editorJs);
-await writeFile(resolve(dist, "editor.css"), editorCss);
-await writeFile(resolve(dist, ".nojekyll"), "");
-await writeFile(resolve(dist, "games", "starter-game.html"), buildDskGameHtml(DEFAULT_DSK_GAME));
-
-const fingerprint = "sha256:" + createHash("sha256").update(indexHtml).update(editorJs).update(editorCss).digest("hex");
-await writeFile(resolve(dist, "deployment.json"), JSON.stringify({
-  schema: "nexusengine-editor.deployment/2",
-  deploymentMode: "branch-root-static-browser-workbench",
-  sourceParent,
-  coreCommit,
-  coreRegistry,
-  artifactFingerprint: fingerprint,
-  entry: "index.html"
-}, null, 2) + "\n");
-
-console.log(`Built browser-native static Editor at ${dist} (${fingerprint})`);
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) await buildStaticSite();

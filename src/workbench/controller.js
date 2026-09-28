@@ -1,72 +1,63 @@
 import { getWorkbenchCatalog, catalogSummary } from "./catalog.js";
 import { createCompositionController } from "./composition-controller.js";
 import { createPlayController } from "./play-controller.js";
-import { createEditorBuildController } from "./build-controller.js";
 import { createValidationGameController } from "./validation-game-controller.js";
-
-const fail = (code, message, details = {}) => Object.assign(new Error(message), { code, details });
-
+import { editorError, assertSourceCommandAllowed } from "./host-contract.js";
+/** Shared orchestration only. Node-only Build is explicitly injected by the local host. */
 export function createEditorWorkbench(host, options = {}) {
   const composition = createCompositionController(host, options.composition);
-  const play = createPlayController(host, composition);
+  const play = createPlayController(host, composition, options.play);
   const game = createValidationGameController(host, composition);
-  const build = options.build === false ? null : createEditorBuildController(options.build ?? {});
+  const build = options.buildService ?? null;
   const log = [];
-  let lastBuildTargets = [], lastBuildPlan = null, lastBuildReceipt = null;
-  const record = (kind, action, result) => { const entry = Object.freeze({ id: `${Date.now()}-${log.length}`, at: new Date().toISOString(), kind, action, result }); log.push(entry); if (log.length > 1000) log.shift(); return entry; };
-
+  let buildTargets = [], buildPlan = null, buildReceipt = null;
   function state() {
     const catalog = getWorkbenchCatalog(host.engine, composition.compositionId);
-    return Object.freeze({
-      schema: "nexusengine.editor-workbench-state/2",
-      status: host.status(),
-      catalog,
-      catalogSummary: catalogSummary(catalog),
-      composition: composition.read(),
+    return { schema: "nexusengine.editor-workbench-state/2", status: host.status(), catalog,
+      catalogSummary: catalogSummary(catalog), composition: composition.read(),
       compositionValidation: composition.read() ? composition.validate() : null,
-      validationGame: game.status(),
-      play: play.status(),
-      buildTargets: lastBuildTargets,
-      buildPlan: lastBuildPlan,
-      buildReceipt: lastBuildReceipt,
-      documents: host.list(),
-      receipts: log.slice(-100),
-    });
+      validationGame: game.status(), play: play.status(), buildTargets, buildPlan, buildReceipt,
+      documents: host.list(), receipts: log.slice(-100) };
   }
-
-  async function execute(method, params = {}) {
+  function requireBuild() { if (!build) throw editorError("EDITOR_BUILD_REQUIRES_LOCAL_HOST", "Core Build requires a local host."); return build; }
+  async function execute(method, p = {}) {
+    assertSourceCommandAllowed(method, play.status().state);
     let result;
     switch (method) {
-      case "workbench-state": result = state(); break;
+      case "workbench-state": return state();
+      case "play-status": return play.status();
+      case "play-frame": return play.frame();
       case "create-validation-game": result = await game.create(); break;
       case "composition-ensure": result = await composition.ensure(); break;
-      case "composition-add-kit": result = await composition.addKit(params.kitId, params.config); break;
-      case "composition-remove-kit": result = await composition.removeKit(params.kitId); break;
-      case "composition-configure": result = await composition.configureNode(params.nodeId, params.config); break;
-      case "composition-enable": result = await composition.setEnabled(params.nodeId, params.enabled); break;
-      case "composition-plan": result = composition.plan(); break;
-      case "validate-project": result = host.engine.n.authoringValidation.project(); break;
-      case "validate-document": result = host.engine.n.authoringValidation.document(params.id); break;
-      case "validate-export": result = host.engine.n.authoringValidation.format({ assemblyId: params.assemblyId ?? "scene", format: params.format ?? "glb" }); break;
-      case "import-formats": result = host.engine.n.authoringImport.formats(); break;
-      case "import-inspect": result = await host.engine.n.authoringImport.inspect(params); break;
-      case "import-commit": result = await host.commitImport(params.plan); break;
-      case "play": result = await play.start(params); break;
-      case "play-input": result = play.input(params.intent ?? params); break;
+      case "composition-add-kit": result = await composition.addKit(p.kitId, p.config); break;
+      case "composition-remove-kit": result = await composition.removeKit(p.kitId); break;
+      case "composition-configure": result = await composition.configureNode(p.nodeId, p.config); break;
+      case "composition-enable": result = await composition.setEnabled(p.nodeId, p.enabled); break;
+      case "composition-plan": return composition.plan();
+      case "validate-project": return host.engine.n.authoringValidation.project();
+      case "validate-document": return host.engine.n.authoringValidation.document(p.id);
+      case "validate-export": return host.engine.n.authoringValidation.format({ assemblyId: p.assemblyId ?? "scene", format: p.format ?? "glb" });
+      case "import-formats": return host.engine.n.authoringImport.formats();
+      case "import-inspect": return host.engine.n.authoringImport.inspect(p);
+      case "import-commit": result = await host.commitImport(p.plan); break;
+      case "play": result = await play.start(p); break;
+      case "play-input": return play.input(p.intent ?? p);
       case "pause": result = play.pause(); break;
       case "resume": result = play.resume(); break;
-      case "play-tick": result = play.tick(params.delta); break;
+      case "play-tick": return play.tick(p.delta);
       case "stop": result = play.stop(); break;
-      case "runtime-preview": result = await play.preview(params); break;
-      case "build-targets": result = build ? await build.listTargets() : []; lastBuildTargets = result; break;
-      case "build-inspect": if (!build) throw fail("EDITOR_BUILD_DISABLED", "Build workbench is disabled."); result = await build.inspect(params.project); break;
-      case "build-plan": if (!build) throw fail("EDITOR_BUILD_DISABLED", "Build workbench is disabled."); result = await build.plan(params.request); lastBuildPlan = result; break;
-      case "build-apply": if (!build) throw fail("EDITOR_BUILD_DISABLED", "Build workbench is disabled."); result = await build.apply(params.planId, params.approval, params.options); lastBuildReceipt = result; break;
-      default: throw fail("EDITOR_WORKBENCH_METHOD", `Unknown workbench method ${method}.`);
+      case "runtime-preview": return play.preview(p);
+      case "build-targets": buildTargets = await requireBuild().listTargets(); return buildTargets;
+      case "build-inspect": return requireBuild().inspect(p.project);
+      case "build-plan": buildPlan = await requireBuild().plan(p.request); result = buildPlan; break;
+      case "build-apply": buildReceipt = await requireBuild().apply(p.planId, p.approval, p.options); result = buildReceipt; break;
+      default: throw editorError("EDITOR_WORKBENCH_METHOD", `Unknown workbench method ${method}.`);
     }
-    record(method.startsWith("build") ? "build" : method.startsWith("play") || ["pause","resume","stop","runtime-preview"].includes(method) ? "runtime" : method.startsWith("validate") ? "validation" : method.startsWith("import") ? "import" : "operation", method, result);
+    // No byte arrays, snapshots, per-frame input, or recursively nested state in the UI log.
+    log.push({ at: new Date().toISOString(), action: method, kind: method.split("-")[0],
+      result: { schema: result?.schema ?? null, status: result?.status ?? result?.state ?? "completed" } });
+    if (log.length > 100) log.shift();
     return result;
   }
-
   return Object.freeze({ state, execute, composition, play, game, build, receipts: () => log.slice() });
 }

@@ -4,3 +4,4 @@ export { createPlayController } from "./play-controller.js";
 export { createValidationGameController } from "./validation-game-controller.js";
 export { createEditorBuildController } from "./build-controller.js";
 export { createEditorWorkbench } from "./controller.js";
+export { assertHost, capabilitiesFor } from "./host-contract.js";

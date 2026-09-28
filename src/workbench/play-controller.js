@@ -1,125 +1,90 @@
 import { createEngine } from "nexusengine";
 import { createAuthoringDomain } from "nexusengine/domains/authoring";
 import { normalizeInputIntent } from "nexusengine/domains/interaction/input";
+import { resolveKitFactory } from "./adapters/kit-factories.js";
+import { editorError, errorRecord } from "./host-contract.js";
 
-const copy = (value) => structuredClone(value);
-const fail = (code, message, details = {}) => Object.assign(new Error(message), { code, details });
-
-async function factoryFor(entry) {
-  const specifier = `nexusengine/${entry.source.subpath.replace(/^\.\//, "")}`;
-  const module = await import(specifier);
-  const factory = module[entry.source.exportName];
-  if (typeof factory !== "function") throw fail("EDITOR_KIT_FACTORY", `Missing ${entry.source.exportName} from ${specifier}.`);
-  return factory;
+export function disposeAuthoringRuntime(engine) {
+  engine?.n.authoringSequence?.dispose?.();
+  engine?.n.authoringPublishing?.clearCache?.();
 }
 
-function transformFor(node) {
-  return node.transform ?? { translation: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] };
-}
-
-export function createPlayController(host, composition) {
-  let session = null, timer = null;
-
+export function createPlayController(host, composition, { resolveFactory = resolveKitFactory } = {}) {
+  let session = null, timer = null, starting = false;
+  function status() {
+    if (!session) return { state: starting ? "starting" : "stopped", ticks: 0, frame: 0, elapsed: 0, sourceProtected: true };
+    return { state: session.state, ticks: session.ticks, frame: session.runtime.clock.frame,
+      elapsed: session.runtime.clock.elapsed, sourceClock: session.sourceClock, sourceProtected: true,
+      previewBehavior: "authoring-transform-motion", input: session.input, controlledNodeId: session.controlledNodeId,
+      error: session.error, installedKits: session.runtime.kits.map(k => k.id) };
+  }
+  function tick(delta = 1 / 60) {
+    if (!session) throw editorError("EDITOR_PLAY_STATE", "Play Mode is not running.");
+    if (!Number.isFinite(delta) || delta <= 0 || delta > 1) throw editorError("EDITOR_PLAY_DELTA", "Tick delta must be greater than 0 and at most 1 second.");
+    if (session.state !== "playing") return status();
+    const priorElapsed = session.runtime.clock.elapsed;
+    session.runtime.tick(delta);
+    const appliedDelta = session.runtime.clock.elapsed - priorElapsed;
+    const project = session.runtime.n.authoringProject;
+    const assembly = project.listDocuments("assembly").some(d => d.id === session.assemblyId) ? project.getDocument(session.assemblyId) : null;
+    const node = assembly?.content.nodes.find(n => n.id === session.controlledNodeId);
+    if (node && (session.input.x || session.input.y)) {
+      const next = structuredClone(node), t = next.transform.translation;
+      t[0] += session.input.x * session.moveSpeed * appliedDelta;
+      t[2] -= session.input.y * session.moveSpeed * appliedDelta;
+      project.execute({ requestId: `editor-play-${session.ticks}`, epoch: project.context().epoch,
+        operations: [{ id: "assembly.node", args: { id: session.assemblyId, expectedRevision: assembly.revision, node: next } }] });
+    }
+    session.ticks++;
+    return status();
+  }
   async function start(options = {}) {
     if (session) return status();
-    const validation = host.engine.n.authoringValidation.project();
-    if (validation.errors) throw fail("EDITOR_PLAY_VALIDATION", "Project validation failed before Play Mode.", { validation });
-    const source = host.snapshot(), plan = composition.read() ? composition.plan() : { ok: true, order: [] };
-    if (!plan.ok) throw fail("EDITOR_PLAY_COMPOSITION", "Game composition is invalid.", { plan });
-    const runtime = createEngine({ kits: createAuthoringDomain({ project: { projectId: source.projectId } }) });
-    runtime.n.authoringProject.loadSnapshot(copy(source));
-    for (const entry of plan.order ?? []) {
-      if (runtime.kits.some((kit) => kit.id === entry.registryId)) continue;
-      const factory = await factoryFor(entry);
-      runtime.installKit(factory(entry.config ?? {}));
-    }
-    session = {
-      runtime,
-      state: "playing",
-      sourceClock: source.clock,
-      startedAt: Date.now(),
-      ticks: 0,
-      assemblyId: options.assemblyId ?? "scene",
-      controlledNodeId: options.controlledNodeId ?? "player-node",
-      moveSpeed: Number.isFinite(options.moveSpeed) ? options.moveSpeed : 3,
-      input: normalizeInputIntent(),
-    };
-    publishInput();
-    if (options.autoTick !== false) timer = setInterval(() => { try { tick(options.delta ?? 1 / 60); } catch {} }, Math.max(4, Math.round((options.delta ?? 1 / 60) * 1000)));
-    return status();
+    if (starting) throw editorError("EDITOR_PLAY_BUSY", "Play is already starting.");
+    if (!Number.isFinite(options.delta ?? 1 / 60) || (options.delta ?? 1 / 60) <= 0 || (options.delta ?? 1 / 60) > 1)
+      throw editorError("EDITOR_PLAY_DELTA", "Tick delta must be greater than 0 and at most 1 second.");
+    if (!Number.isFinite(options.moveSpeed ?? 3) || (options.moveSpeed ?? 3) < 0 || (options.moveSpeed ?? 3) > 1000)
+      throw editorError("EDITOR_PLAY_SPEED", "Preview movement speed must be between 0 and 1000.");
+    starting = true; let runtime = null;
+    try {
+      const validation = host.engine.n.authoringValidation.project();
+      if (validation.errors) throw editorError("EDITOR_PLAY_VALIDATION", "Project validation failed.", { validation });
+      const source = host.snapshot();
+      const plan = composition.read() ? composition.plan() : { ok: true, order: [] };
+      if (!plan.ok) throw editorError("EDITOR_PLAY_COMPOSITION", "Runtime composition is invalid.", { plan });
+      runtime = createEngine({ kits: createAuthoringDomain({ project: { projectId: source.projectId } }) });
+      runtime.n.authoringProject.loadSnapshot(structuredClone(source));
+      for (const entry of plan.order) {
+        if (runtime.kits.some(k => k.id === entry.registryId)) continue;
+        const factory = await resolveFactory(entry);
+        runtime.installKit(factory(entry.config ?? {}));
+      }
+      if (host.snapshot().clock !== source.clock || host.snapshot().epoch !== source.epoch) throw editorError("EDITOR_PLAY_STALE", "Source changed while Play was starting.");
+      session = { runtime, state: "playing", sourceClock: source.clock, ticks: 0,
+        assemblyId: options.assemblyId ?? "scene", controlledNodeId: options.controlledNodeId ?? "player-node",
+        moveSpeed: Number.isFinite(options.moveSpeed) ? options.moveSpeed : 3,
+        input: normalizeInputIntent(), error: null };
+      if (options.autoTick !== false) timer = setInterval(() => {
+        try { tick(options.delta ?? 1 / 60); }
+        catch (error) { clearInterval(timer); timer = null; session.state = "failed"; session.error = errorRecord(error); }
+      }, Math.max(4, Math.round((options.delta ?? 1 / 60) * 1000)));
+      return status();
+    } catch (error) { disposeAuthoringRuntime(runtime); throw error; }
+    finally { starting = false; }
   }
-
-  function publishInput() {
-    if (!session?.runtime.n.input) return;
-    session.runtime.n.input.update({ intent: session.input }, "input");
-  }
-
-  function input(intent = {}) {
-    if (!session) throw fail("EDITOR_PLAY_STATE", "Play Mode is not running.");
-    session.input = normalizeInputIntent(intent);
-    publishInput();
-    return status();
-  }
-
-  function moveControlledNode(delta) {
-    if (!session || (!session.input.x && !session.input.y)) return;
-    const project = session.runtime.n.authoringProject;
-    let assembly;
-    try { assembly = project.getDocument(session.assemblyId); } catch { return; }
-    const node = assembly.content.nodes.find((entry) => entry.id === session.controlledNodeId);
-    if (!node) return;
-    const t = transformFor(node), next = copy(node);
-    next.transform = {
-      ...t,
-      translation: [
-        t.translation[0] + session.input.x * session.moveSpeed * delta,
-        t.translation[1],
-        t.translation[2] - session.input.y * session.moveSpeed * delta,
-      ],
-    };
-    project.execute({
-      requestId: `editor-play-${session.ticks}-${session.controlledNodeId}`,
-      epoch: project.context().epoch,
-      operations: [{ id: "assembly.node", args: { id: session.assemblyId, expectedRevision: assembly.revision, node: next } }],
-    });
-  }
-
-  function status() {
-    if (!session) return { state: "stopped", ticks: 0, frame: 0, elapsed: 0, sourceProtected: true, input: normalizeInputIntent() };
-    return {
-      state: session.state,
-      ticks: session.ticks,
-      frame: session.runtime.clock.frame,
-      elapsed: session.runtime.clock.elapsed,
-      sourceClock: session.sourceClock,
-      sourceProtected: true,
-      input: session.input,
-      controlledNodeId: session.controlledNodeId,
-      installedKits: session.runtime.kits.map((kit) => kit.id),
-    };
-  }
-
-  function tick(delta = 1 / 60) {
-    if (!session) throw fail("EDITOR_PLAY_STATE", "Play Mode is not running.");
-    if (session.state === "paused") return status();
-    moveControlledNode(delta);
-    session.runtime.tick(delta);
-    session.ticks += 1;
-    return status();
-  }
-
-  async function preview({ format = "glb" } = {}) {
-    if (!session) throw fail("EDITOR_PLAY_STATE", "Play Mode is not running.");
-    return session.runtime.n.authoringExport.export({
-      requestId: `editor-runtime-preview-${session.ticks}-${format}`,
-      assemblyId: session.assemblyId,
-      format,
-    });
-  }
-
-  function pause() { if (!session) throw fail("EDITOR_PLAY_STATE", "Play Mode is not running."); session.state = "paused"; return status(); }
-  function resume() { if (!session) throw fail("EDITOR_PLAY_STATE", "Play Mode is not running."); session.state = "playing"; return status(); }
-  function stop() { if (timer) { clearInterval(timer); timer = null; } if (!session) return status(); session = null; return status(); }
-
-  return Object.freeze({ start, input, tick, preview, pause, resume, stop, status, get runtime() { return session?.runtime ?? null; } });
+  const requireSession = () => { if (!session) throw editorError("EDITOR_PLAY_STATE", "Play Mode is not running."); };
+  return Object.freeze({
+    start, tick, status,
+    input(intent = {}) { requireSession(); session.input = normalizeInputIntent(session.state === "playing" ? intent : {}); session.runtime.n.input?.update({ intent: session.input }, "input"); return status(); },
+    pause() { requireSession(); if (session.error) throw editorError("EDITOR_PLAY_FAILED", "Stop the failed runtime before pausing."); session.state = "paused"; session.input = normalizeInputIntent(); session.runtime.n.input?.update({ intent: session.input }, "input"); return status(); },
+    resume() { requireSession(); if (session.error) throw editorError("EDITOR_PLAY_FAILED", "Stop the failed runtime before restarting."); session.state = "playing"; return status(); },
+    stop() { if (starting) throw editorError("EDITOR_PLAY_BUSY", "Wait for Play startup to finish."); if (timer) clearInterval(timer); timer = null; disposeAuthoringRuntime(session?.runtime); session = null; return status(); },
+    async preview({ format = "glb" } = {}) { requireSession(); return session.runtime.n.authoringExport.export({ assemblyId: session.assemblyId, format }); },
+    frame() {
+      requireSession();
+      const assembly = session.runtime.n.authoringAssembly.evaluate(session.assemblyId);
+      return { status: status(), nodes: assembly.nodes.map(n => ({ id: n.id, transform: n.transform })), cameras: assembly.cameras };
+    },
+    get runtime() { return session?.runtime ?? null; },
+  });
 }
